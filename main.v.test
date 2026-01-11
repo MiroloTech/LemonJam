@@ -1,0 +1,226 @@
+module main
+
+import gg
+import log
+import mirrorlib { Server, Client, Packet, NetworkInstance }
+
+import std.geom2 { Vec2 }
+import uilib { UI, Button, Toaster, LineEdit, Text }
+
+@[heap]
+pub struct App {
+	pub mut:
+	ui                     UI                         = UI{}
+	toaster                &Toaster                   = unsafe { nil }
+	ip_adress_edit         &LineEdit                  = unsafe { nil }
+	btn_create_server      &Button                    = unsafe { nil }
+	btn_create_client      &Button                    = unsafe { nil }
+	btn_net_close          &Button                    = unsafe { nil }
+	
+	btn_send_packet        &Button                    = unsafe { nil }
+	message_edit           &LineEdit                  = unsafe { nil }
+	target_ip              string
+	
+	mirror                 ?&NetworkInstance
+}
+
+fn test_main() {
+	mut app := App{}
+	app.ui.ctx = gg.new_context(
+		width:            400
+		height:           1000
+		bg_color:         app.ui.style.color_bg.get_gx()
+		user_data:        &app
+		window_title:     "LemonJam"
+		init_fn:          app.init
+		frame_fn:         app.frame
+		event_fn:         app.event
+		cleanup_fn:       app.cleanup
+		sample_count:     4
+	)
+	app.ui.ctx.run()
+}
+
+pub fn (mut app App) init() {
+	mut toaster := Toaster{}
+	toaster.from = Vec2{400 - 40, 1000 - 40}
+	toaster.size = Vec2{320.0, 30.0}
+	app.toaster = &toaster
+	app.ui.components << toaster
+	
+	
+	// ========== START / STOP NETWORK ==========
+	
+	btn_create_server := Button{
+		from: Vec2{20, 20}
+		size: Vec2{100, 20}
+		title: "Create Server"
+		user_data: &app.ui
+		on_pressed: fn (user_data voidptr) {
+			mut app := unsafe { &App(user_data) }
+			
+			// Start Server
+			if app.mirror != none { app.mirror.close() or { log.warn("Failed to close previously opened mirror instance") } }
+			app.mirror = Server.init(
+				&app.ui,
+				fn (packet Packet, user_data voidptr, origin string) {
+					mut app := unsafe { &App(user_data) }
+					toast_msg := "from '${origin}' : ${packet.text_str()}"
+					app.toaster.add_toast(toast_msg, .hint, 2.0)
+					log.info(toast_msg)
+				}
+			) or {
+				app.toaster.add_toast("Failed to init server : ${err}", .error, 5.0)
+				log.error("Failed to init server : ${err}")
+				return
+			}
+			
+			// Notify and disable conflicting actions
+			app.toaster.add_toast("Server created", .info, 2.0)
+			app.btn_create_client.disabled = true
+			app.btn_create_server.disabled = true
+			app.btn_net_close.disabled = false
+			
+			// Notify of server IP
+			ip := mirrorlib.get_open_ip6() or { "?" }
+			log.info("Server IP : ${ip}")
+			app.toaster.add_toast("Server IP : ${ip}", .hint, 5.0)
+		}
+	}
+	app.btn_create_server = &btn_create_server
+	app.ui.actors << btn_create_server
+	
+	btn_create_client := Button{
+		from: Vec2{20, 60}
+		size: Vec2{100, 20}
+		title: "Create Client"
+		user_data: &app.ui
+		on_pressed: fn (user_data voidptr) {
+			mut app := unsafe { &App(user_data) }
+			
+			// Start Client
+			if app.mirror != none { app.mirror.close() or { log.warn("Failed to close previously opened mirror instance") } }
+			app.mirror = Client.init(
+				app.ip_adress_edit.text,
+				mirrorlib.listener_port,
+				&app.ui,
+				fn (packet Packet, user_data voidptr, origin string) {
+					mut app := unsafe { &App(user_data) }
+					toast_msg := "from '${origin}' : ${packet.text_str()}"
+					app.toaster.add_toast(toast_msg, .hint, 2.0)
+					log.info(toast_msg)
+				}
+			) or {
+				app.toaster.add_toast("Failed to init client : ${err}", .error, 5.0)
+				log.error("Failed to init client : ${err}")
+				return
+			}
+			
+			// Notify and disable conflicting actions
+			app.toaster.add_toast("Client created", .info, 2.0)
+			app.btn_create_client.disabled = true
+			app.btn_create_server.disabled = true
+			app.btn_net_close.disabled = false
+		}
+	}
+	app.btn_create_client = &btn_create_client
+	app.ui.actors << btn_create_client
+	
+	btn_net_close := Button{
+		from: Vec2{20, 100}
+		size: Vec2{100, 20}
+		title: "Close"
+		disabled: true
+		user_data: &app.ui
+		on_pressed: fn (user_data voidptr) {
+			mut app := unsafe { &App(user_data) }
+			
+			// Close connection
+			if app.mirror != none {
+				app.mirror.close() or {
+					app.toaster.add_toast("Failed to close Net instance : ${err}", .error, 5.0)
+					log.error("Failed to close Net instance : ${err}")
+				}
+				app.mirror = ?&NetworkInstance(none)
+			}
+			
+			// Notify and disable conflicting actions
+			app.toaster.add_toast("Connection closed", .info, 2.0)
+			app.btn_create_client.disabled = false
+			app.btn_create_server.disabled = false
+			app.btn_net_close.disabled = true
+		}
+	}
+	app.btn_net_close = &btn_net_close
+	app.ui.actors << btn_net_close
+	
+	
+	ip_adress_edit := LineEdit{
+		from: Vec2{140, 60}
+		size: Vec2{200, 20}
+		placeholder: "IP Adress"
+		text: "127.0.0.1"
+		user_data: &app.ui
+		on_change: fn (text string, user_data voidptr) {
+			mut app := unsafe { &App(user_data) }
+			app.target_ip = text
+		}
+	}
+	app.ip_adress_edit = &ip_adress_edit
+	app.ui.actors << ip_adress_edit
+	
+	
+	// ========== SEND PACKETS ==========
+	
+	btn_send_packet := Button{
+		from: Vec2{20, 160}
+		size: Vec2{100, 20}
+		title: "Send Message"
+		user_data: &app.ui
+		on_pressed: fn (user_data voidptr) {
+			mut app := unsafe { &App(user_data) }
+			
+			// Send packet
+			if app.mirror != none {
+				msg := app.message_edit.text
+				app.mirror.send_packet(
+					action: 1
+					data: msg.bytes()
+				)
+				
+				// Notify and disable conflicting actions
+				app.toaster.add_toast("Message sent : ${msg}", .hint, 2.0)
+			}
+		}
+	}
+	app.btn_send_packet = &btn_send_packet
+	app.ui.actors << btn_send_packet
+	
+	message_edit := LineEdit{
+		from: Vec2{140, 160}
+		size: Vec2{200, 20}
+		placeholder: "Message"
+		user_data: &app.ui
+	}
+	app.message_edit = &message_edit
+	app.ui.actors << message_edit
+}
+
+
+pub fn (mut app App) frame() {
+	app.ui.draw()
+}
+
+pub fn (mut app App) event(event &gg.Event, _ voidptr) {
+	app.ui.event(event)
+}
+
+pub fn (mut app App) cleanup() {
+	if app.mirror != none {
+		app.mirror.close() or {
+			log.error("Failed to properly close mirror instance : ${err}")
+			return
+		}
+		println("Mirror closed")
+	}
+}
