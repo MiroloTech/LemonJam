@@ -22,6 +22,10 @@
 - [ ] Proper Sliding Note implementation
 - [ ] Rewriting of the event manager ( if neccessary )
 
+## v 0.3
+- [ ] Lyrics Writer
+- [ ] Ceetain OPTIONAL AI featuree (stem seperation, notes to voice, etc.)
+- [ ] Online helper lib (premade chords, community effects & instruments, global SFX and vocals, etc.)
 
 ## v 1.0.0
 
