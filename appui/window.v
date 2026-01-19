@@ -1,10 +1,12 @@
 module appui
 
 import gg
+import log
 
-import std { Color }
-import audio.objs { Note }
+// import std { Color }
 import std.geom2 { Vec2 }
+import app { Project }
+import audio.objs { Pattern }
 import uilib { UI, Toaster, HSplit, VSplit }
 
 pub struct Window {
@@ -17,7 +19,9 @@ pub struct Window {
 	browser                Browser                   = Browser{}
 	rack                   Rack                      = Rack{}
 	main_vsplit            VSplit                    = VSplit{}
-	note_editor            NoteEditor                = NoteEditor{}
+	note_editor            &NoteEditor               = &NoteEditor{}
+	
+	project                &Project                  = unsafe { nil }
 	
 	// TODO : [x] Browser, Rack, Routing Graph, Timeline, Sound Editor, Pattern Editor
 }
@@ -27,6 +31,10 @@ pub fn (mut win Window) init(mut ui UI) {
 	win.toaster = Toaster{}
 	win.toaster.from = Vec2{400 - 40, 1000 - 40}
 	win.toaster.size = Vec2{320.0, 30.0}
+	
+	// Init project
+	win.project = &Project{}
+	win.project.ui_ptr = &ui
 	
 	// Init header
 	win.header.options["File"] = [
@@ -47,6 +55,7 @@ pub fn (mut win Window) init(mut ui UI) {
 		HeaderAction{ name: "Undo"          hotkey: "Ctrl+Z" },
 		HeaderAction{ name: "Redo"          hotkey: "Ctrl+Y" },
 	]
+	win.header.init(mut ui)
 	
 	// Init horizontal panel sizing
 	win.main_hsplit.splits = [300.0, 500.0]
@@ -66,19 +75,33 @@ pub fn (mut win Window) init(mut ui UI) {
 	]
 	
 	// Init rack
-	win.rack.tabs = [
-		RackResource.new(mut ui, "Pattern",      ui.style.color_pattern,        "tab-pattern",     [
-			RackElement.new("Jazz Beat",      ui.style.color_pattern),
-			RackElement.new("Bass",           ui.style.color_pattern),
-			RackElement.new("Chords",         ui.style.color_pattern),
-		], fn (user_data voidptr) {
+	mut pattern_rack := RackResource.new(mut ui, "Pattern", ui.style.color_pattern, "tab-pattern", [], 
+		fn (user_data voidptr) {
 			mut ui := unsafe { &UI(user_data) }
 			ui.call_hook("new-pattern", unsafe { nil }) or { return }
-		}) // > Connect hook to create new pattern
+		}
+	) // > Connect hook to create new pattern
+	
+	win.project.new_pattern_user_data = pattern_rack
+	win.project.on_ui_new_pattern = fn (pattern &Pattern, rack_ptr voidptr, ui_ptr voidptr) {
+		mut rack := unsafe { &RackResource(rack_ptr) }
+		mut ui := unsafe { &UI(ui_ptr) }
+		mut element := RackElement.new(pattern.name,  ui.style.color_pattern)
+		element.connect_hook(fn [mut ui] (pattern_ptr voidptr) {
+			ui.call_hook("open-pattern", pattern_ptr) or { return }
+		}, pattern)
+		rack.elements << element
+	}
+	
+	// TODO : Now display project instruments, effects and sounds in Rack
+	// TODO : Properly implement racks with hooks on re-creation of pattern
+	
+	win.rack.tabs = [
+		pattern_rack,
 		
 		RackResource.new(mut ui, "Instruments",  ui.style.color_instrument,     "tab-instrument",  [
-			RackElement.new("Electric Keys",  ui.style.color_pattern),
-			RackElement.new("Drum Kit",       ui.style.color_pattern),
+			RackElement.new("Electric Keys",  ui.style.color_instrument),
+			RackElement.new("Drum Kit",       ui.style.color_instrument),
 		], none)
 		
 		RackResource.new(mut ui, "Effects",      ui.style.color_effect,         "tab-effect",      [
@@ -95,6 +118,7 @@ pub fn (mut win Window) init(mut ui UI) {
 	]
 	
 	// Init note editor
+	/*
 	note1  := Note{from: 0.0, len: 4.0, id: 24 + 1}
 	note2  := Note{from: 0.0, len: 4.0, id: 24 + 6}
 	note3  := Note{from: 0.0, len: 4.0, id: 24 + 8}
@@ -113,10 +137,20 @@ pub fn (mut win Window) init(mut ui UI) {
 	note13 := Note{from: 12.0, len: 4.0, id: 24 + 6}
 	note14 := Note{from: 12.0, len: 4.0, id: 24 + 11}
 	win.note_editor.notes = [ &note1, &note2, &note3, &note4, &note5, &note6, &note7, &note8, &note9, &note10, &note11, &note12, &note13, &note14 ]
+	*/
 	
-	for _, note in win.note_editor.notes {
+	win.project.load_from_file("${@VMODROOT}/temp.json") or { log.error("Failed to load project form file : ${err}") } // TEMP & TODO
+	win.toaster.add_toast("Save file loaded", .info, 2.0)
+	
+	// UNSAFE !!!!
+	win.note_editor.open_pattern(win.project.patterns[0] or { unsafe { nil } })
+	ui.hooks["open-pattern"] = fn [mut win] (pattern_ptr voidptr) { win.note_editor.open_pattern(pattern_ptr) }
+	
+	/*
+	for note in win.note_editor.notes {
 		win.note_editor.note_colors[note] = Color.hex("#ff8383")
 	}
+	*/
 	
 	// Init footer
 	lj_version := @VMOD_FILE.find_between("version: '", "'")
@@ -198,6 +232,10 @@ pub fn (mut win Window) event(mut ui UI, event &gg.Event) {
 }
 
 pub fn (mut win Window) cleanup(mut ui UI) {
+	
+}
+
+pub fn (mut win Window) on_pattern_selected() {
 	
 }
 

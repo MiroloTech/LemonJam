@@ -22,7 +22,7 @@ pub struct NoteEditor {
 	shown_notes                  int              = 12 * 6 + 1
 	
 	colors                       []Color          = [
-		Color.hex("#ff8383"), Color.hex("#f17633"), 
+		Color.hex("#ff8383"), Color.hex("#f17633"),
 		Color.hex("#3a994c"), Color.hex("#56a2e8"),
 		Color.hex("#b594ff"), Color.hex("#b8bdc2"),
 		Color.hex("#aa8d84")
@@ -31,7 +31,6 @@ pub struct NoteEditor {
 	hovering_color               int              = -1
 	
 	notes                        []&Note          = []
-	note_colors                  map[voidptr]Color
 	selected_notes               []&Note
 	hovering_note                &Note            = unsafe { nil }
 	left_handles                 []&Note
@@ -56,8 +55,9 @@ pub struct NoteEditor {
 	
 	mut:
 	panning                      bool
-	current_pattern              ?Pattern         = Pattern{name: "Harmonics"}
+	pattern                      &Pattern         = unsafe { nil }
 	pattern_selector             ?ActionList
+	dragging_note_handles        bool
 }
 
 const note_tags := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
@@ -246,8 +246,8 @@ pub fn (editor NoteEditor) draw_notes(mut ui UI) {
 	ui.push_scissor(a: editor.from + Vec2{editor.piano_width, editor.header_height}, b: editor.from + editor.size - Vec2{editor.piano_width, editor.header_height})
 	rails := editor.get_piano_rails(editor.from, editor.size)
 	
-	for note in editor.notes {
-		color := editor.note_colors[note] or { Color.hex("#ffffff") }
+	for note in editor.pattern.notes {
+		color := editor.pattern.colors[note] or { Color.hex("#ffffff") }
 		rail_id := int(note.id)
 		rail := rails[rail_id] or {
 			log.warn("Tried to draw note out of range : ${note}")
@@ -444,8 +444,7 @@ pub fn (editor NoteEditor) draw_tools(mut ui UI) {
 	)
 	
 	// Draw pattern selector
-	// current_pattern
-	pattern_name := if editor.current_pattern == none { "---" } else { editor.current_pattern.name }
+	pattern_name := if editor.pattern == unsafe { nil } { "---" } else { editor.pattern.name }
 	icon_size := editor.header_height * 0.5 - ui.style.padding * 2.0
 	ui.ctx.draw_line(
 		f32(editor.from.x + editor.piano_width), f32(editor.from.y + editor.header_height * 0.5),
@@ -462,12 +461,14 @@ pub fn (editor NoteEditor) draw_tools(mut ui UI) {
 		vertical_align: .middle
 		family: ui.style.font_regular
 	)
+	/*
 	ui.draw_icon(
 		"point-down",
 		editor.from + Vec2{editor.piano_width - ui.style.padding - icon_size, editor.header_height * 0.5 + ui.style.padding},
 		Vec2.v(icon_size),
 		ui.style.color_text.alpha(0.65)
 	)
+	*/
 }
 
 
@@ -553,11 +554,13 @@ pub fn (mut editor NoteEditor) control_notes(mut ui UI, event &gg.Event) ! {
 	rails := editor.get_piano_rails(editor.from, editor.size)
 	
 	// > Reset handles
-	editor.right_handles = []
-	editor.left_handles = []
+	if !editor.dragging_note_handles {
+		editor.right_handles = []
+		editor.left_handles = []
+	}
 	
-	for note in editor.notes {
-		color := editor.note_colors[note] or { Color.hex("#ffffff") }
+	for note in editor.pattern.notes {
+		color := editor.pattern.colors[note] or { Color.hex("#ffffff") }
 		rail_id := int(note.id)
 		rail := rails[rail_id] or {
 			log.warn("Tried to draw note out of range : ${note}")
@@ -575,7 +578,7 @@ pub fn (mut editor NoteEditor) control_notes(mut ui UI, event &gg.Event) ! {
 		
 		// Set handles
 		is_mouse_in_rail := rail.a.y <= mpos.y && mpos.y < rail.b.y
-		if is_mouse_in_rail && is_color_selected {
+		if is_mouse_in_rail && is_color_selected && !editor.dragging_note_handles {
 			// > Calculate the distance from the mouse to the edges of the note to determine the handles
 			dist_left := fromx - mpos.x
 			dist_right := (fromx + sizex) - mpos.x
@@ -592,13 +595,32 @@ pub fn (mut editor NoteEditor) control_notes(mut ui UI, event &gg.Event) ! {
 	}
 	
 	if event.typ == .mouse_down && event.mouse_button == .left {
-		if editor.hovering_note == unsafe { nil } {
+		if editor.left_handles.len > 0 || editor.right_handles.len > 0 {
+			editor.dragging_note_handles = true
+		} else if editor.hovering_note == unsafe { nil } {
 			editor.selected_notes = []
 		} else if event.modifiers & 0b1 == 0b1 {
 			editor.selected_notes << editor.hovering_note
 		} else {
 			editor.selected_notes = [editor.hovering_note]
 		}
+		return uilib.surpress_event()
+	}
+	
+	if event.typ == .mouse_move && editor.dragging_note_handles {
+		step := f64(event.mouse_dx) / editor.pixels_per_beat
+		for mut right in editor.right_handles {
+			right.len += step
+		}
+		for mut left in editor.left_handles {
+			left.from += step
+			left.len -= step
+		}
+	}
+	
+	if event.typ == .mouse_up {
+		editor.dragging_note_handles = false
+		// ... left and right handles recalculated on release event
 	}
 }
 
@@ -665,3 +687,19 @@ pub fn (mut editor NoteEditor) control_playhead(mut ui UI, event &gg.Event) ! {
 		}
 	}
 }
+
+
+pub fn (mut editor NoteEditor) open_pattern(pattern &Pattern) {
+	editor.pattern = pattern
+	editor.notes = pattern.notes
+}
+
+
+/*
+Next simplified TODO:
+- Implement new event system into more components
+- Note dragging & removing
+- Simple saving to test loading
+- Instrument selection & note highlighting in note editor
+- Split note editor into multiple files to clean up code
+*/

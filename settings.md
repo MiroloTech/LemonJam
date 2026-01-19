@@ -2,6 +2,10 @@
 ## Theme
 - Theme - [Concrete, Midnight, Vintage, White]
 - Primary Color - (ColorRGBA)
+- Note Color 1 - (ColorRGB)
+- Note Color 2 - (ColorRGB)
+- Note Color 3 - (ColorRGB)
+- Note Color ... 1 - 7
 
 # Networking
 ## Streaming

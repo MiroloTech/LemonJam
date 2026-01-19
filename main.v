@@ -37,7 +37,10 @@ pub fn (mut app App) init() {
 
 
 pub fn (mut app App) frame() {
+	app.ui.ctx.begin()
 	app.window.frame(mut app.ui)
+	app.ui.ctx.end()
+	
 	app.ui.draw()
 }
 

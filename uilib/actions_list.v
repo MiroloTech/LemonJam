@@ -26,7 +26,7 @@ pub fn (actions []Action) get_height(ui UI) f64 {
 			height += f64(ui.style.font_size) + ui.style.list_gap
 		}
 	}
-	return height
+	return height - ui.style.list_gap
 }
 
 
@@ -41,7 +41,12 @@ pub struct ActionList {
 
 pub fn (al ActionList) draw(mut ui UI) {
 	// TODO: sub-options
-	mut y := al.from.y + ui.style.list_gap
+	offset := 4.0
+	mut from := al.from + Vec2{0.0, offset}
+	if from.x < offset {
+		from.x = offset
+	}
+	mut y := from.y
 	height := al.actions.get_height(ui)
 	
 	// Draw action list background
@@ -53,13 +58,14 @@ pub fn (al ActionList) draw(mut ui UI) {
 	)
 	*/
 	ui.draw_rect(
-		al.from,
+		from,
 		Vec2{al.size.x, height},
 		
-		fill_color: ui.style.color_panel
-		outline_color: ui.style.color_panel.brighten(0.1)
+		fill_color: ui.style.color_bg
+		outline_color: ui.style.color_panel
+		inset: -offset
 		outline: 1.0
-		inset: -1.0
+		radius: 0.0
 	)
 	
 	// Draw actions
@@ -69,10 +75,10 @@ pub fn (al ActionList) draw(mut ui UI) {
 			seperator_y := y + ui.style.seperator_height * 0.5
 			ggp.draw_thick_line(
 				mut ui.ctx,
-				f32(al.from.x), f32(seperator_y),
-				f32(al.from.x + al.size.x), f32(seperator_y),
-				f32(2.0),
-				ui.style.color_grey.get_gx()
+				f32(from.x), f32(seperator_y),
+				f32(from.x + al.size.x), f32(seperator_y),
+				f32(1.0),
+				ui.style.color_panel.get_gx()
 			)
 			
 			y += ui.style.seperator_height
@@ -80,7 +86,7 @@ pub fn (al ActionList) draw(mut ui UI) {
 			// > Draw hover background
 			if i == al.action_hovered {
 				ui.ctx.draw_rect_filled(
-					f32(al.from.x), f32(y),
+					f32(from.x), f32(y),
 					f32(al.size.x), f32(f64(ui.style.font_size) + ui.style.list_gap),
 					ui.style.color_panel.brighten(0.05).get_gx()
 				)
@@ -88,7 +94,7 @@ pub fn (al ActionList) draw(mut ui UI) {
 			
 			// > Draw option name
 			ui.ctx.draw_text(
-				int(al.from.x + ui.style.padding), int(y + f64(ui.style.font_size) * 0.5),
+				int(from.x + ui.style.padding), int(y + f64(ui.style.font_size) * 0.5 + 2.0),
 				action.name,
 				color: ui.style.color_text.get_gx()
 				size: ui.style.font_size
@@ -100,7 +106,7 @@ pub fn (al ActionList) draw(mut ui UI) {
 			
 			// > Draw option hotkey
 			ui.ctx.draw_text(
-				int(al.from.x + al.size.x - ui.style.padding), int(y + f64(ui.style.font_size) * 0.5),
+				int(from.x + al.size.x - ui.style.padding), int(y + f64(ui.style.font_size) * 0.5 + 2.0),
 				action.hotkey,
 				color: ui.style.color_grey.get_gx()
 				size: ui.style.font_size
@@ -116,7 +122,9 @@ pub fn (al ActionList) draw(mut ui UI) {
 }
 
 pub fn (mut al ActionList) event(mut ui UI, event &gg.Event) ! {
-	mut y := al.from.y + ui.style.list_gap
+	offset := 1.0
+	from := al.from + Vec2{offset, 0.0}
+	mut y := from.y + offset
 	// height := al.actions.get_height(ui)
 	mpos := Vec2{event.mouse_x, event.mouse_y}
 	al.action_hovered = -1
@@ -127,7 +135,7 @@ pub fn (mut al ActionList) event(mut ui UI, event &gg.Event) ! {
 			y += ui.style.seperator_height
 		} else {
 			height := f64(ui.style.font_size) + ui.style.list_gap
-			if al.from.x <= mpos.x && mpos.x < al.from.x + al.size.x  &&  y <= mpos.y && mpos.y < y + height {
+			if from.x <= mpos.x && mpos.x < from.x + al.size.x  &&  y <= mpos.y && mpos.y < y + height {
 				al.action_hovered = i
 			}
 			
@@ -140,18 +148,17 @@ pub fn (mut al ActionList) event(mut ui UI, event &gg.Event) ! {
 		action := al.actions[al.action_hovered] or { return }
 		if !action.is_seperator && action.on_selected != none {
 			action.on_selected(action.tag, action.user_data)
+			return surpress_event()
 		}
 	}
 	
 	// Surpress following event reactions
-	if al.from.x <= mpos.x && mpos.x < al.from.x + al.size.x  &&  al.from.y <= mpos.y && mpos.y < y {
+	if from.x <= mpos.x && mpos.x < from.x + al.size.x  &&  from.y <= mpos.y && mpos.y < y {
 		return surpress_event()
 	}
 	
-	/*
 	// Blocks any following event notice. Enable this if clicking "away" from the menu shouldn't trigger any other thing.
-	if event.typ == .mouse_down {
+	if event.typ == .mouse_down && al.action_hovered != -1 {
 		return surpress_event()
 	}
-	*/
 }

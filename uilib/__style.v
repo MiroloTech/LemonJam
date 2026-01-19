@@ -35,7 +35,7 @@ pub struct Style {
 	line_spacing               f64                 = 8.0
 	seperator_height           f64                 = 10.0
 	margin                     f64                 = 6.0
-	rounding                   f64                 = 6.0
+	rounding                   f64                 = 4.0
 	outline_size               f64                 = 2.0
 	font_size                  int                 = 16
 	rect_stripe_spacing        f64                 = 8.0

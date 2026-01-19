@@ -130,11 +130,11 @@ pub fn (mut browser Browser) draw(mut ui UI) {
 pub fn (mut browser Browser) event(mut ui UI, event &gg.Event) ! {
 	for mut group in browser.groups {
 		// > Control parent buttons
-		group.button.event(mut ui, event)
+		group.button.event2(mut ui, event)!
 		
 		for mut element in group.elements {
 			// > Control individual buttons
-			element.button.event(mut ui, event)
+			element.button.event2(mut ui, event)!
 			if element.button.is_hovered {
 				ui.call_hook("footer", &FooterHook{msg: element.descritpion, event_typ: .mouse_move}) or { continue }
 			}

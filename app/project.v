@@ -1,0 +1,186 @@
+module app
+
+import audio.objs { Instrument, Pattern, Effect, Note }
+import mirrorlib { NID, NIDType }
+
+import std { Color }
+
+import semver
+import os
+import log
+import x.json2 as json
+
+@[heap]
+pub struct Project {
+	pub mut:
+	name                        string
+	session                     ?Session
+	
+	sample_rate                 u32
+	channels                    u32
+	
+	instruments                 []&Instrument
+	effects                     []&Effect
+	patterns                    []&Pattern
+	
+	
+	// Hooks
+	ui_ptr                      voidptr
+	new_pattern_user_data       voidptr
+	on_ui_new_pattern           ?fn (pattern &Pattern, user_data voidptr, ui_ptr voidptr)
+}
+
+pub fn (project Project) save_to_file(path string) ! {
+	// TODO
+}
+
+pub fn (mut project Project) load_from_file(path string) ! {
+	// Load json data
+	text := os.read_file(path) or { return error("Failed to open save file : ${err}") }
+	raw_data := json.decode[json.Any](text) or { return error("Failed to load top-most layer of save file : ${err}") }
+	data := raw_data.as_map()
+	project_data := (data["project"] or { return error("Failed to find project data in file") }).as_map()
+	
+	// Check compatibillity
+	version_str := get_app_version()
+	version := semver.from(version_str) or {
+		return error("Application is at invalid version : ${version_str}")
+	}
+	
+	file_version_str := project_data["lmnj-version"] or { return error("Failed to find project version in file") }
+	file_version := semver.from(version_str) or {
+		return error("Project version given is of invalid format : ${file_version_str}")
+	}
+	
+	if file_version < version {
+		log.warn("Save file version is less than the current application version")
+	}
+	
+	// Load basic settings
+	project.sample_rate = (project_data["sample-rate"] or { 44100 }).u32()
+	project.channels = (project_data["channels"] or { 2 }).u32()
+	
+	// Load instruments
+	instruments := data["instruments"] or { []json.Any{} }
+	for instrument_id, raw_instrument_data in instruments.arr() {
+		instrument_data := raw_instrument_data.as_map()
+		instrument_file := instrument_data["file"] or { return error("Failed to find file in instrument ${instrument_id}") }
+		raw_instrument_user_data := instrument_data["data"] or { "" }
+		project.new_instrument(instrument_file.str(), raw_instrument_user_data.str()) or {
+			return error("Failed to load instrument with file ${instrument_file.str()} : ${err}")
+		}
+	}
+	
+	// Load patterns
+	patterns := data["patterns"] or { []json.Any{} }
+	for raw_pattern_data in patterns.arr() {
+		pattern_data := raw_pattern_data.as_map()
+		mut pattern := project.new_pattern((pattern_data["name"] or { "unnamed" }).str())
+		
+		// > Parse notes
+		raw_notes := pattern_data["notes"] or { return error("Failed to find property 'notes' in save file") }
+		notes := raw_notes.arr()
+		for note_data in notes {
+			nid := project.new_nid(.note)
+			note := Note.from_data_tag(note_data.str(), nid)
+			pattern.notes << &note
+		}
+		
+		// > Parse note colors
+		raw_note_colors := pattern_data["colors"] or { return error("Failed to find property 'notes' in save file") }
+		note_colors := raw_note_colors.as_map()
+		for color, raw_note_ids in note_colors {
+			for note_id in raw_note_ids.arr() {
+				note := pattern.notes[note_id.int()] or { continue }
+				pattern.colors[note] = Color.hex(color.str())
+			}
+		}
+		
+		// > Parse note instruments
+		// { "0": [0, 1, 2], "1":, [3, 4, 5] }
+		raw_instrument_data := pattern_data["instruments"] or { json.Any("") }
+		mut notes_covered_by_instrument := []int{len: notes.len, init: index}
+		for str_instrument_id, raw_instrument_note_arr in raw_instrument_data.as_map() {
+			// 0: [0, 1, 2]
+			instrument_id := str_instrument_id.int()
+			instrument_raw_notes := raw_instrument_note_arr.arr()
+			instrument := project.instruments[instrument_id] or { continue }
+			
+			for instrument_raw_note in instrument_raw_notes {
+				// 0, 1, 2
+				id := instrument_raw_note.int()
+				note := pattern.notes[id] or { continue }
+				notes_covered_by_instrument.delete(notes_covered_by_instrument.index(id))
+				pattern.instruments[note] = instrument
+			}
+		}
+		
+		// >> Call new_pattern hook
+		if project.on_ui_new_pattern != none {
+			project.on_ui_new_pattern(pattern, project.new_pattern_user_data, project.ui_ptr)
+		}
+	}
+	
+	// TODO : The rest...
+}
+
+
+// Creates a new unique NID instance of given type and mirrors that to every other connected user
+pub fn (project Project) new_nid(typ NIDType) &NID {
+	// TODO
+	// log.info("New NID created : ${typ}")
+	return unsafe { nil }
+}
+
+
+
+pub fn (mut project Project) lock_nid(mut nid &NID) {
+	// TODO
+}
+
+pub fn (mut project Project) unlock_nid(mut nid &NID) {
+	// TODO
+}
+
+
+
+// ===== EDITOR CONTROLS =====
+
+// Creates a new pattern and mirrors that in the seesion
+pub fn (mut project Project) new_pattern(name string) &Pattern {
+	mut pattern := &Pattern{
+		name: name
+		notes: []
+		nid: project.new_nid(.pattern)
+	}
+	project.patterns << pattern
+	return pattern
+}
+
+pub fn (mut project Project) delete_pattern(pattern &Pattern) {
+	// TODO
+}
+
+// Creates a new pattern, parses the json-data and mirrors that in the session
+pub fn (mut project Project) new_instrument(file string, json_data string) !&Instrument {
+	mut instrument := &Instrument{
+		name: file.all_before_last(".").title()
+		nid: project.new_nid(.instrument)
+		
+	}
+	instrument.load() or {
+		return error("Failed to create new instrument : ${err}")
+	}
+	project.instruments << instrument
+	return instrument
+}
+
+
+// ===== UTILLITY =====
+
+// fn (project Project) find_project_by_nid(nid &NID) !int  // TODO
+
+pub fn get_app_version() string {
+	vmod := @VMOD_FILE
+	return vmod.find_between("version: '", "'")
+}

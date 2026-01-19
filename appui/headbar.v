@@ -37,6 +37,7 @@ fn (actions []HeaderAction) to_ui_action_list(from Vec2, size Vec2) ActionList {
 	}
 }
 
+@[heap]
 pub struct Header {
 	pub mut:
 	height          f64                 = 24.0
@@ -47,6 +48,18 @@ pub struct Header {
 	action_list     ?ActionList
 	project_name    string              = "unnamed.lmnj*"
 }
+
+
+pub fn (mut header Header) init(mut ui UI) {
+	// Connect event hooks
+	ui.on_mouse_down << fn [mut header] (mut ui UI, mpos Vec2) ! {
+		header.on_mouse_down(mut ui, mpos)!
+	}
+	ui.on_mouse_move << fn [mut header] (mut ui UI, mpos Vec2, mdelta Vec2) ! {
+		header.on_mouse_move(mut ui, mpos, mdelta)!
+	}
+}
+
 
 pub fn (header Header) draw(mut ui UI) {
 	header_width := ui.get_window_size().x
@@ -108,40 +121,56 @@ pub fn (header Header) draw(mut ui UI) {
 
 
 pub fn (mut header Header) event(mut ui UI, event &gg.Event) ! {
-	mpos := Vec2{event.mouse_x, event.mouse_y}
-	header.option_hovered = -1
-	
-	mut x_positions := []f64{}
-	mut option_x := 0.0
-	mut i := 0
-	for title, _ in header.options {
-		width := ui.ctx.text_width(title) + ui.style.strong_padding
-		x_positions << option_x
-		
-		if mpos.y >= 0.0 && mpos.y < header.height && mpos.x >= option_x  && mpos.x < option_x + width {
-			header.option_hovered = i
-			break
-		}
-		
-		option_x += width
-		i++
-	}
-	
-	if event.typ == .mouse_down {
-		if header.option_hovered != -1 {
-			header.option_open = header.option_hovered
-			option_tag := header.options.keys()[header.option_hovered] or { return }
-			header.action_list = (header.options[option_tag] or { return }).to_ui_action_list(
-				Vec2{x_positions[i] or { 0.0 }, header.height},
-				Vec2{160.0, 0.0}
-			)
-		} else {
-			header.option_open = -1
-			header.action_list = none
-		}
-	}
-	
 	if header.action_list != none {
 		header.action_list.event(mut ui, event)!
 	}
 }
+
+
+// ===== EVENT HOOKS =====
+
+pub fn (mut header Header) on_mouse_down(mut ui UI, _ Vec2) ! {
+	if header.option_hovered != -1 {
+		header.option_open = header.option_hovered
+		option_tag := header.options.keys()[header.option_hovered] or { return }
+		x, _ := header.get_option_dimensions(ui, header.option_open)
+		header.action_list = (header.options[option_tag] or { return }).to_ui_action_list(
+			Vec2{x, header.height},
+			Vec2{160.0, 0.0}
+		)
+	} else {
+		header.option_open = -1
+		header.action_list = none
+	}
+}
+
+pub fn (mut header Header) on_mouse_move(mut ui UI, mpos Vec2, _ Vec2) ! {
+	header.option_hovered = -1
+	
+	for i in 0..header.options.len {
+		x, width := header.get_option_dimensions(ui, i)
+		
+		if mpos.y >= 0.0 && mpos.y < header.height && mpos.x >= x  && mpos.x < x + width {
+			header.option_hovered = i
+		}
+	}
+}
+
+
+
+// ===== UTILITY =====
+
+pub fn (header Header) get_option_dimensions(ui UI, id int) (f64, f64) {
+	mut x := 0.0
+	for i in 0..id {
+		title := header.options.keys()[i] or { break }
+		width := ui.ctx.text_width(title) // + ui.style.strong_padding
+		x += width
+	}
+	
+	title := header.options.keys()[id] or { return 0.0, 0.0 }
+	width := ui.ctx.text_width(title) + ui.style.strong_padding
+	
+	return x, width
+}
+

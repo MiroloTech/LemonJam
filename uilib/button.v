@@ -106,6 +106,31 @@ pub fn (mut btn Button) event(mut ui UI, event &gg.Event) {
 }
 
 
+pub fn (mut btn Button) event2(mut ui UI, event &gg.Event) ! {
+	mpos := Vec2{event.mouse_x, event.mouse_y}
+	rect := Rect2{btn.from, btn.from + btn.size}
+	btn.is_hovered = rect.is_point_inside(mpos)
+	
+	if btn.disabled {
+		btn.is_hovered = false
+		btn.is_pressed = false
+		return
+	}
+	
+	if event.typ == .mouse_down && btn.is_hovered && !btn.is_pressed {
+		btn.is_pressed = true
+		if btn.on_pressed != none {
+			btn.on_pressed(btn.user_data)
+			return surpress_event()
+		}
+	}
+	
+	if event.typ == .mouse_up && btn.is_pressed {
+		btn.is_pressed = false
+	}
+}
+
+
 fn (btn Button) draw_solid(mut ui UI) {
 	color := if btn.is_hovered && !btn.disabled { btn.color_secondary or { ui.style.color_primary_dark } } else { btn.color_primary or { ui.style.color_primary } }
 	ui.ctx.draw_rounded_rect_filled(

@@ -10,6 +10,7 @@ import std.geom2 { Rect2, Vec2 }
 const not_found_icon_src := $embed_file("./icons/not-found.png").to_bytes()
 
 pub type Hook = fn (user_data voidptr)
+pub type EventHook = fn (mut ui UI) !
 
 @[heap]
 pub struct UI {
@@ -25,9 +26,15 @@ pub struct UI {
 	icons               map[string]&gg.Image
 	not_found_icon      &gg.Image             = unsafe { nil }
 	
-	components          []Component
-	actors              []Actors
 	hooks               map[string]Hook
+	
+	actions             map[string]string                // Map of custom keyboard-actions, written in standart key shortcut format, i.e. "save": "ctrl+s"
+	on_action_press     map[string][]EventHook
+	on_action_release   map[string][]EventHook
+	on_mouse_move       []fn (mut ui UI, mpos Vec2, mdelta Vec2) !
+	on_mouse_down       []fn (mut ui UI, mpos Vec2) !
+	on_mouse_up         []fn (mut ui UI, mpos Vec2) !
+	on_event            []fn (mut ui UI, event Event) !  // NOTICE : Events surpressed at on_mouse_move, on_action_press, etc. DON'T block on_event; on_eevnt is called after all other event hooks
 }
 
 pub fn (ui UI) get_window_size() Vec2 {
@@ -70,15 +77,6 @@ pub fn (mut ui UI) init() {
 }
 
 pub fn (mut ui UI) draw() {
-	ui.ctx.begin()
-	for mut comp in ui.components {
-		comp.draw(mut ui)
-	}
-	for mut actor in ui.actors {
-		actor.draw(mut ui)
-	}
-	ui.ctx.end()
-	
 	// Update delta time
 	ui.delta = ui.timer.elapsed().seconds()
 	ui.timer.restart()
@@ -88,8 +86,78 @@ pub fn (mut ui UI) draw() {
 }
 
 pub fn (mut ui UI) event(event &gg.Event) {
-	for mut actor in ui.actors {
-		actor.event(mut ui, event)
+	// Keyboard actions
+	if event.typ == .key_down || event.typ == .key_up {
+		// > Collect hook functions for specific event typ
+		mut hook_map := map[string][]EventHook{}
+		if event.typ == .key_down {
+			hook_map = ui.on_action_press.clone() // WARNING : IDK what this does since I don't know how lambda functions look like on the stack
+		} else if event.typ == .key_up {
+			hook_map = ui.on_action_release.clone()
+		}
+		
+		for action, action_code in ui.actions {
+			if event_to_action_code(event) == action_code.to_lower() {
+				hooks := hook_map[action] or { [] }
+				for hook in hooks {
+					hook(mut ui) or {
+						if !(err is EventSurpressError) { log.warn("Failed to call specific hook on action '${action}' : ${err}") }
+						break
+					}
+				}
+			}
+		}
+	}
+	
+	// Mouse actions
+	if event.typ == .mouse_move || event.typ == .mouse_down || event.typ == .mouse_up {
+		mpos := Vec2{event.mouse_x, event.mouse_y}
+		mdelta := Vec2{event.mouse_dx, event.mouse_dy}
+		match event.typ {
+			.mouse_move {
+				for hook in ui.on_mouse_move {
+					hook(mut ui, mpos, mdelta) or {
+						if !(err is EventSurpressError) { log.warn("Failed to call specific hook on mouse move : ${err}") }
+						break
+					}
+				}
+			}
+			.mouse_down {
+				for hook in ui.on_mouse_down {
+					hook(mut ui, mpos) or {
+						if !(err is EventSurpressError) { log.warn("Failed to call specific hook on mouse down : ${err}") }
+						break
+					}
+				}
+			}
+			.mouse_up {
+				for hook in ui.on_mouse_up {
+					hook(mut ui, mpos) or {
+						if !(err is EventSurpressError) { log.warn("Failed to call specific hook on mouse up : ${err}") }
+						break
+					}
+				}
+			}
+			else {  }
+		}
+	}
+	
+	// General Event
+	for hook in ui.on_event {
+		ui_event := Event{
+			frame_count:    event.frame_count
+			typ:            event.typ
+			mpos:           Vec2{event.mouse_x, event.mouse_y}
+			mdelta:         Vec2{event.mouse_dx, event.mouse_dy}
+			key_repeat:     event.key_repeat
+			char_code:      event.char_code
+			key_code:       event.key_code
+			window_size:    Vec2{f64(event.window_width), f64(event.window_height)}
+		}
+		hook(mut ui, ui_event) or {
+			if !(err is EventSurpressError) { log.warn("Failed to call specific hook on general event : ${err}") }
+			break
+		}
 	}
 }
 
@@ -99,8 +167,16 @@ pub fn (mut ui UI) call_hook(tag string, data voidptr) ! {
 		return error("Tried calling inexistant hook : ${tag}")
 	}
 	hook(data)
+	// log.info("Hook called : ${tag}")
 }
 
+
+pub fn event_to_action_code(event &gg.Event) string {
+	if event.typ == .key_down {
+		
+	}
+	return ""
+}
 
 pub fn (ui UI) top_left() Vec2 {
 	return Vec2{0, 0}
@@ -116,24 +192,6 @@ pub fn (ui UI) bottom_right() Vec2 {
 	return ui.get_window_size()
 }
 
-
-pub interface Component {
-	mut:
-	from             Vec2
-	size             Vec2
-	
-	draw(mut ui UI)
-}
-
-pub interface Actors {
-	mut:
-	from             Vec2
-	size             Vec2
-	user_data        voidptr
-	
-	draw(mut ui UI)
-	event(mut ui UI, event &gg.Event)
-}
 
 
 // Custom error structure to retern, when an event is surpressed

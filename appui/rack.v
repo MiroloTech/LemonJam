@@ -38,6 +38,14 @@ pub fn RackElement.new(title string, color Color) RackElement {
 	}
 }
 
+pub fn (mut element RackElement) connect_hook(func fn (user_data voidptr), user_data voidptr) {
+	element.on_open = func
+	element.user_data = user_data
+	
+	element.button.on_pressed = func
+	element.button.user_data = user_data
+}
+
 
 pub struct RackResource {
 	pub mut:
@@ -53,8 +61,8 @@ pub struct RackResource {
 	on_add       ?fn (user_data voidptr)
 }
 
-pub fn RackResource.new(mut ui UI, title string, color Color, icon string, elements []RackElement, on_btn_press_fn ?fn (user_data voidptr)) RackResource {
-	return RackResource{
+pub fn RackResource.new(mut ui UI, title string, color Color, icon string, elements []RackElement, on_btn_press_fn ?fn (user_data voidptr)) &RackResource {
+	return &RackResource{
 		title: title
 		color: color
 		icon: icon
@@ -81,7 +89,7 @@ pub struct Rack {
 	size         Vec2
 	
 	tab_height   f64                = 36.0
-	tabs         []RackResource
+	tabs         []&RackResource
 	tab_open     int
 	tab_hovered  int                = -1
 }

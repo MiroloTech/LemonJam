@@ -111,16 +111,14 @@ pub fn (toast Toast) draw(mut ctx gg.Context, pos Vec2, opacity f64) {
 			)
 		}
 		
-		ctx.set_text_cfg(
+		ctx.draw_text(
+			int(text_pos.x), int(text_pos.y),
+			count_text,
 			color:           toast.style.count_color.alpha(opacity).get_gx()
 			family:          toast.style.font_path
 			size:            toast.style.text_size
 			vertical_align:  .middle
 			align:           .left
-		)
-		ctx.draw_text_default(
-			int(text_pos.x), int(text_pos.y),
-			count_text
 		)
 	}
 }
