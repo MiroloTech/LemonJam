@@ -2,7 +2,6 @@ module main
 
 import gg
 
-// import std.geom2 { Vec2 }
 import uilib { UI }
 import appui { Window }
 
@@ -39,14 +38,16 @@ pub fn (mut app App) init() {
 pub fn (mut app App) frame() {
 	app.ui.ctx.begin()
 	app.window.frame(mut app.ui)
+	app.ui.draw()
 	app.ui.ctx.end()
 	
-	app.ui.draw()
+	// TODO : Maybe split rendering of different bigger objects into different draw calls ( maybe fixes coloring issue in toast text color )
+	// TODO : Add screenshot to github README
 }
 
 pub fn (mut app App) event(event &gg.Event, _ voidptr) {
+	app.ui.event(event) or { return }
 	app.window.event(mut app.ui, event)
-	app.ui.event(event)
 }
 
 pub fn (mut app App) cleanup() {

@@ -46,6 +46,7 @@ pub fn (mut element RackElement) connect_hook(func fn (user_data voidptr), user_
 	element.button.user_data = user_data
 }
 
+pub type AddHook = fn (user_data voidptr)
 
 pub struct RackResource {
 	pub mut:
@@ -58,7 +59,7 @@ pub struct RackResource {
 	
 	add_btn      ?Button
 	user_data    voidptr
-	on_add       ?fn (user_data voidptr)
+	on_add       ?AddHook
 }
 
 pub fn RackResource.new(mut ui UI, title string, color Color, icon string, elements []RackElement, on_btn_press_fn ?fn (user_data voidptr)) &RackResource {
@@ -79,6 +80,18 @@ pub fn RackResource.new(mut ui UI, title string, color Color, icon string, eleme
 				font_size: 32
 			}
 		} else { ?Button(none) }
+	}
+}
+pub fn (mut rack_resource RackResource) set_on_btn_press_fn(mut ui UI, func AddHook) {
+	rack_resource.add_btn = Button{
+		title: "+"
+		typ: .flat
+		user_data: ui
+		on_pressed: func
+		
+		color_primary: rack_resource.color
+		color_secondary: rack_resource.color.darken(0.1)
+		font_size: 32
 	}
 }
 

@@ -35,6 +35,8 @@ pub struct UI {
 	on_mouse_down       []fn (mut ui UI, mpos Vec2) !
 	on_mouse_up         []fn (mut ui UI, mpos Vec2) !
 	on_event            []fn (mut ui UI, event Event) !  // NOTICE : Events surpressed at on_mouse_move, on_action_press, etc. DON'T block on_event; on_eevnt is called after all other event hooks
+	
+	popups              []Popup
 }
 
 pub fn (ui UI) get_window_size() Vec2 {
@@ -83,9 +85,45 @@ pub fn (mut ui UI) draw() {
 	
 	sapp.set_mouse_cursor(ui.cursor)
 	ui.cursor = .default
+	
+	// Draw popups seperately
+	if ui.popups.len > 0 {
+		// > Draw darkened BG
+		ui.draw_rect(
+			ui.top_left(),
+			ui.bottom_right(),
+			fill_color: ui.style.color_bg.alpha(0.5)
+		)
+		
+		// > Draw popups
+		for mut popup in ui.popups {
+			popup.draw(mut ui)
+		}
+		
+		// > Re-Update cursor
+		sapp.set_mouse_cursor(ui.cursor)
+	}
 }
 
-pub fn (mut ui UI) event(event &gg.Event) {
+pub fn (mut ui UI) event(event &gg.Event) ! {
+	ui_event := Event{
+		frame_count:    event.frame_count
+		typ:            event.typ
+		mpos:           Vec2{event.mouse_x, event.mouse_y}
+		mdelta:         Vec2{event.mouse_dx, event.mouse_dy}
+		key_repeat:     event.key_repeat
+		char_code:      event.char_code
+		key_code:       event.key_code
+		window_size:    Vec2{f64(event.window_width), f64(event.window_height)}
+	}
+	
+	if ui.popups.len > 0 {
+		for mut popup in ui.popups {
+			popup.event(mut ui, event) or { break }
+		}
+		return surpress_event()
+	}
+	
 	// Keyboard actions
 	if event.typ == .key_down || event.typ == .key_up {
 		// > Collect hook functions for specific event typ
@@ -144,16 +182,6 @@ pub fn (mut ui UI) event(event &gg.Event) {
 	
 	// General Event
 	for hook in ui.on_event {
-		ui_event := Event{
-			frame_count:    event.frame_count
-			typ:            event.typ
-			mpos:           Vec2{event.mouse_x, event.mouse_y}
-			mdelta:         Vec2{event.mouse_dx, event.mouse_dy}
-			key_repeat:     event.key_repeat
-			char_code:      event.char_code
-			key_code:       event.key_code
-			window_size:    Vec2{f64(event.window_width), f64(event.window_height)}
-		}
 		hook(mut ui, ui_event) or {
 			if !(err is EventSurpressError) { log.warn("Failed to call specific hook on general event : ${err}") }
 			break
@@ -181,7 +209,6 @@ pub fn event_to_action_code(event &gg.Event) string {
 pub fn (ui UI) top_left() Vec2 {
 	return Vec2{0, 0}
 }
-
 pub fn (ui UI) top_right() Vec2 {
 	return Vec2{ui.get_window_size().x, 0}
 }
@@ -190,6 +217,9 @@ pub fn (ui UI) bottom_left() Vec2 {
 }
 pub fn (ui UI) bottom_right() Vec2 {
 	return ui.get_window_size()
+}
+pub fn (ui UI) center() Vec2 {
+	return ui.get_window_size() * Vec2{0.5, 0.5}
 }
 
 

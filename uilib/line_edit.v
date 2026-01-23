@@ -30,7 +30,7 @@ pub struct LineEdit {
 // TODO : Implement Ctrl + Edit
 // TODO : Implement disabled state
 
-pub fn (mut edit LineEdit) draw(mut ui UI) {
+pub fn (edit LineEdit) draw(mut ui UI) {
 	// Draw bottom focus line
 	focus_line_color := if edit.is_focused { ui.style.color_primary } else { ui.style.color_bg.brighten(0.05) }
 	ui.ctx.draw_rect_filled(
@@ -197,6 +197,13 @@ pub fn (mut edit LineEdit) event(mut ui UI, event &gg.Event) {
 
 // Inserts text at caret, or replaces selected text, if text is selected
 pub fn (mut edit LineEdit) insert(text string) {
+	// > Fix selection being in front of caret
+	if edit.selection_start > edit.caret_pos {
+		temp := edit.caret_pos
+		edit.caret_pos = edit.selection_start
+		edit.selection_start = temp
+	}
+	
 	if edit.selection_start != -1 && edit.selection_start != edit.caret_pos {
 		sel_from := int_min(edit.selection_start, edit.caret_pos)
 		sel_to := int_max(edit.selection_start, edit.caret_pos)

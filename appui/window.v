@@ -8,6 +8,7 @@ import std.geom2 { Vec2 }
 import app { Project }
 import audio.objs { Pattern }
 import uilib { UI, Toaster, HSplit, VSplit }
+import appui.popups { NewPatternPopup }
 
 pub struct Window {
 	pub mut:
@@ -75,19 +76,34 @@ pub fn (mut win Window) init(mut ui UI) {
 	]
 	
 	// Init rack
-	mut pattern_rack := RackResource.new(mut ui, "Pattern", ui.style.color_pattern, "tab-pattern", [], 
-		fn (user_data voidptr) {
-			mut ui := unsafe { &UI(user_data) }
-			ui.call_hook("new-pattern", unsafe { nil }) or { return }
-		}
-	) // > Connect hook to create new pattern
+	mut pattern_rack := RackResource.new(mut ui, "Pattern", ui.style.color_pattern, "tab-pattern", [], none)
 	
+	// > Attach popup call
+	pattern_rack.set_on_btn_press_fn(mut ui, fn [pattern_rack] (user_data voidptr) {
+		mut ui := unsafe { &UI(user_data) }
+		
+		// Open naming popup
+		pos := if pattern_rack.add_btn == none { ui.center() } else { pattern_rack.add_btn.from + Vec2{0.0, pattern_rack.add_btn.size.y + ui.style.padding} }
+		ui.popups << NewPatternPopup.new(
+			ui,
+			pos,
+			Vec2{300, 125},
+			// win.project,
+			unsafe { nil }
+		)
+		
+		// > Connect hook to create new pattern
+		ui.call_hook("new-pattern", unsafe { nil }) or { return }
+	})
+	
+	// Manage showing of selected patterns
 	win.project.new_pattern_user_data = pattern_rack
 	win.project.on_ui_new_pattern = fn (pattern &Pattern, rack_ptr voidptr, ui_ptr voidptr) {
 		mut rack := unsafe { &RackResource(rack_ptr) }
 		mut ui := unsafe { &UI(ui_ptr) }
 		mut element := RackElement.new(pattern.name,  ui.style.color_pattern)
 		element.connect_hook(fn [mut ui] (pattern_ptr voidptr) {
+			// Call hook
 			ui.call_hook("open-pattern", pattern_ptr) or { return }
 		}, pattern)
 		rack.elements << element
@@ -161,7 +177,6 @@ pub fn (mut win Window) init(mut ui UI) {
 }
 
 // NOTICE : Make sure, that the drawing order is mostyle inverted from the event controlling order. This mostly insures, that events from a top level don't propagate to lower levels
-// TODO : Implement event blocking system for higher levels (stop rest of function from getting that event call)
 
 pub fn (mut win Window) frame(mut ui UI) {
 	// Draw browser

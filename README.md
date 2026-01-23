@@ -1,3 +1,6 @@
+# Current App State
+![preview screenshot](image.png)
+
 # TODO
 
 ## v 0.1

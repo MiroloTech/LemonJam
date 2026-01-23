@@ -38,6 +38,7 @@ pub struct Style {
 	rounding                   f64                 = 4.0
 	outline_size               f64                 = 2.0
 	font_size                  int                 = 16
+	font_size_title            int                 = 21
 	rect_stripe_spacing        f64                 = 8.0
 	scroll_speed               f64                 = 12.0
 	pan_speed                  f64                 = 1.0
