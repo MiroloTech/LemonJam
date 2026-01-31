@@ -1,5 +1,7 @@
+# WARNING : VEEERRRYYY WORK IN PROGRESS AT THE MOMENT!!!
+
 # Current App State
-![preview screenshot](image.png)
+![Preview of LemonJam progress](LemonJamState2png.png)
 
 # TODO
 
