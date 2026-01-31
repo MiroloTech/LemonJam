@@ -3,27 +3,31 @@ module uilib
 import gg
 import clipboard
 
+import std { Color }
 import std.geom2 { Vec2, Rect2 }
 
 
 pub struct LineEdit {
 	pub mut:
-	from             Vec2
-	size             Vec2
-	text             string
-	placeholder      string                        = "..."
-	is_focused       bool
-	is_hovered       bool
-	is_dragging      bool
-	disabled         bool
-	mono             bool
+	from                        Vec2
+	size                        Vec2
+	text                        string
+	placeholder                 string                        = "..."
+	is_focused                  bool
+	is_hovered                  bool
+	is_dragging                 bool
+	disabled                    bool
+	mono                        bool
 	
-	caret_pos        int
-	selection_start  int                           = -1
+	caret_pos                   int
+	selection_start             int                           = -1
 	
-	user_data        voidptr                       = unsafe { nil }
-	on_change        ?fn (text string, user_data voidptr)
-	on_submitted     ?fn (text string, user_data voidptr)
+	user_data                   voidptr                       = unsafe { nil }
+	on_change                   ?fn (text string, user_data voidptr)
+	on_submitted                ?fn (text string, user_data voidptr)
+	
+	underline_color             ?Color
+	underline_color_focused     ?Color
 }
 
 // TODO : Fix space behaviour with non-mono fonts ( spaces are larger, and the letter after the space is smaller, when selecting )
@@ -32,7 +36,7 @@ pub struct LineEdit {
 
 pub fn (edit LineEdit) draw(mut ui UI) {
 	// Draw bottom focus line
-	focus_line_color := if edit.is_focused { ui.style.color_primary } else { ui.style.color_bg.brighten(0.05) }
+	focus_line_color := if edit.is_focused { edit.underline_color_focused or { ui.style.color_primary } } else { edit.underline_color or { ui.style.color_bg.brighten(0.05) } }
 	ui.ctx.draw_rect_filled(
 		f32(edit.from.x), f32(edit.from.y + edit.size.y - 2.0),
 		f32(edit.size.x), f32(2.0),
@@ -175,6 +179,17 @@ pub fn (mut edit LineEdit) event(mut ui UI, event &gg.Event) {
 			mut cb := clipboard.new()
 			edit.insert(cb.paste())
 			cb.destroy()
+		}
+		
+		// Submit text
+		if event.key_code == .enter {
+			edit.is_focused = false
+			edit.is_dragging = false
+			edit.selection_start = -1
+			edit.caret_pos = 0
+			if edit.on_submitted != none {
+				edit.on_submitted(edit.text, edit.user_data)
+			}
 		}
 	}
 	

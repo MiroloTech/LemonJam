@@ -8,7 +8,7 @@ import std.geom2 { Vec2 }
 import app { Project }
 import audio.objs { Pattern }
 import uilib { UI, Toaster, HSplit, VSplit }
-import appui.popups { NewPatternPopup }
+import appui.popups { NewPatternPopup, NewSessionPopup }
 
 pub struct Window {
 	pub mut:
@@ -21,6 +21,7 @@ pub struct Window {
 	rack                   Rack                      = Rack{}
 	main_vsplit            VSplit                    = VSplit{}
 	note_editor            &NoteEditor               = &NoteEditor{}
+	timeline               &Timeline                 = &Timeline{}
 	
 	project                &Project                  = unsafe { nil }
 	
@@ -56,6 +57,10 @@ pub fn (mut win Window) init(mut ui UI) {
 		HeaderAction{ name: "Undo"          hotkey: "Ctrl+Z" },
 		HeaderAction{ name: "Redo"          hotkey: "Ctrl+Y" },
 	]
+	win.header.options["Session"] = [
+		HeaderAction{ name: "Start Session" }
+		HeaderAction{ name: "Stop Session"  disabled: true }
+	]
 	win.header.init(mut ui)
 	
 	// Init horizontal panel sizing
@@ -79,7 +84,7 @@ pub fn (mut win Window) init(mut ui UI) {
 	mut pattern_rack := RackResource.new(mut ui, "Pattern", ui.style.color_pattern, "tab-pattern", [], none)
 	
 	// > Attach popup call
-	pattern_rack.set_on_btn_press_fn(mut ui, fn [pattern_rack] (user_data voidptr) {
+	pattern_rack.set_on_btn_press_fn(mut ui, fn [mut pattern_rack, mut win] (user_data voidptr) {
 		mut ui := unsafe { &UI(user_data) }
 		
 		// Open naming popup
@@ -88,16 +93,24 @@ pub fn (mut win Window) init(mut ui UI) {
 			ui,
 			pos,
 			Vec2{300, 125},
-			// win.project,
-			unsafe { nil }
+			win.project
+			// unsafe { nil }
 		)
-		
-		// > Connect hook to create new pattern
-		ui.call_hook("new-pattern", unsafe { nil }) or { return }
 	})
+	
+	ui.hooks["add-to-pattern-list"] = fn [mut win, mut pattern_rack, mut ui] (pattern_ptr voidptr) {
+		pattern := unsafe { &Pattern(pattern_ptr) }
+		mut element := RackElement.new(pattern.name,  ui.style.color_pattern)
+		element.connect_hook(fn [mut ui] (pattern_ptr voidptr) {
+			// Call hook
+			ui.call_hook("open-pattern", pattern_ptr) or { return }
+		}, pattern)
+		pattern_rack.elements << element
+	}
 	
 	// Manage showing of selected patterns
 	win.project.new_pattern_user_data = pattern_rack
+	/*
 	win.project.on_ui_new_pattern = fn (pattern &Pattern, rack_ptr voidptr, ui_ptr voidptr) {
 		mut rack := unsafe { &RackResource(rack_ptr) }
 		mut ui := unsafe { &UI(ui_ptr) }
@@ -108,6 +121,8 @@ pub fn (mut win Window) init(mut ui UI) {
 		}, pattern)
 		rack.elements << element
 	}
+	// TODO : Remove obsulete on_ui_new_pattern
+	*/
 	
 	// TODO : Now display project instruments, effects and sounds in Rack
 	// TODO : Properly implement racks with hooks on re-creation of pattern
@@ -156,11 +171,15 @@ pub fn (mut win Window) init(mut ui UI) {
 	*/
 	
 	win.project.load_from_file("${@VMODROOT}/temp.json") or { log.error("Failed to load project form file : ${err}") } // TEMP & TODO
-	win.toaster.add_toast("Save file loaded", .info, 2.0)
+	win.project.update_ui_from_save_file(mut ui)
+	// win.toaster.add_toast("Save file loaded", .info, 2.0) // TODO : Move the loading to seperate function and buffer toasts until first redraw
 	
 	// UNSAFE !!!!
 	win.note_editor.open_pattern(win.project.patterns[0] or { unsafe { nil } })
 	ui.hooks["open-pattern"] = fn [mut win] (pattern_ptr voidptr) { win.note_editor.open_pattern(pattern_ptr) }
+	
+	// Call initialization hook for user button
+	ui.call_hook("on-username-change", win.project.user_name.str) or {  }
 	
 	/*
 	for note in win.note_editor.notes {
@@ -174,6 +193,23 @@ pub fn (mut win Window) init(mut ui UI) {
 	
 	// > Init footer hook
 	ui.hooks["footer"] = win.footer.display_until_hook
+	ui.hooks["toast-error"] = fn [mut win] (msg_ptr voidptr) {
+		msg := unsafe { cstring_to_vstring(msg_ptr) }
+		win.toaster.add_toast(msg, .error, 2.0)
+	}
+	ui.hooks["toast-info"] = fn [mut win] (msg_ptr voidptr) {
+		msg := unsafe { cstring_to_vstring(msg_ptr) }
+		win.toaster.add_toast(msg, .info, 2.0)
+	}
+	
+	
+	// ui.popups << NewSessionPopup.new(ui, ui.top_left() + Vec2{80, 80}, ui.bottom_right() - Vec2{160, 160}, mut win.project)
+	
+	// Test-Init Timeline
+	win.timeline.reload(ui, win.project) or {
+		win.toaster.add_toast("Failed to reload timeline", .error, 2.0)
+		log.error("Failed to reload timeline")
+	}
 }
 
 // NOTICE : Make sure, that the drawing order is mostyle inverted from the event controlling order. This mostly insures, that events from a top level don't propagate to lower levels
@@ -199,6 +235,12 @@ pub fn (mut win Window) frame(mut ui UI) {
 	win.note_editor.from = Vec2{vsplit_x, note_editor_y}
 	win.note_editor.size = Vec2{vsplit_width, note_editor_height}
 	win.note_editor.draw(mut ui)
+	
+	// Draw Timeline
+	timeline_y, timelint_height := win.main_vsplit.get_split(0)
+	win.timeline.from = Vec2{vsplit_x, timeline_y}
+	win.timeline.size = Vec2{vsplit_width, timelint_height}
+	win.timeline.draw(mut ui)
 	
 	// Draw main vertical splitter
 	win.main_vsplit.from = Vec2{vsplit_x,     win.main_hsplit.from.y}
@@ -244,13 +286,12 @@ pub fn (mut win Window) event(mut ui UI, event &gg.Event) {
 	
 	// Control Note Editor
 	win.note_editor.event(mut ui, event) or { return }
+	
+	// Control Timeline
+	win.timeline.event(mut ui, event) or { return }
 }
 
 pub fn (mut win Window) cleanup(mut ui UI) {
-	
-}
-
-pub fn (mut win Window) on_pattern_selected() {
 	
 }
 

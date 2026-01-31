@@ -1,135 +1,69 @@
 module mirrorlib
 
-import net
+import os
 import log
-import sync
+import x.json2 as json
+
+pub enum ServerStatus {
+	offline
+	live
+	maintenance
+	coming_soon
+}
 
 @[heap]
 pub struct Server {
 	pub:
-	is_server      bool                 = true
-	
-	mut:
-	conns          map[int]&Conn
-	next_conn_id   int
-	listener       &net.TcpListener
-	mutex          sync.Mutex          // TODO : Implement mutex for server
+	key       string
+	title     string
+	ip        string
+	lat       f64
+	lon       f64
 	
 	pub mut:
-	user_data      voidptr              = unsafe { nil }
-	on_packet      ?FnOnPacket
-	
-	// TODO : Add on_client_connect
+	status    ServerStatus
+	ping      f64                   = -1.0       // ms
 }
 
-pub fn Server.init(user_data voidptr, on_packet ?FnOnPacket) !&Server {
-	// > Initialize listener
-	mut listener := net.listen_tcp(.ip6, ":${listener_port}", dualstack: true) or { return error("Failed to open listener for new TCP Connections : ${err}") }
-	listener.is_blocking = false // Probably useless but whatever
-	
-	conns := map[int]&Conn{}
-	
-	mut server := &Server{
-		listener: listener
-		conns: conns
-		
-		user_data: user_data
-		on_packet: on_packet
-	}
-	
-	go server.handle_listener()
-	return server
-}
 
-// Handles all the users, that request a connection
-pub fn (mut server Server) handle_listener() {
-	for {
-		// > Accept new TCP connection if available
-		// mut listener := net.listen_tcp(.ip, "127.0.0.1:${listener_port}", dualstack: true) or { return }
-		// listener.is_blocking = false
-		
-		// Accept any new connection
-		mut tcp := server.listener.accept() or { return }
-		// tcp.set_read_timeout(1000)
-		mut conn := Conn.new(mut tcp, server, on_mirror_packet)
-		
-		// Write new connection to list of connections
-		server.mutex.@lock()
-		println("Connections locked for adding a new connection")
-		
-		id := server.next_conn_id
-		server.next_conn_id += 1
-		server.conns[id] = conn
-		
-		server.mutex.unlock()
-		log.info("Net Connection made : ${conn.get_ip()}")
-		
-		// Start Update loop
-		go conn.update()
-	}
-}
-
-fn on_mirror_packet(packet Packet, user_data voidptr, origin string) {
-	mut server := unsafe { &Server(user_data) }
-	log.info("Package received from '${origin}' : ${packet.text_str()}")
-	
-	// Send mirrored packet on seperate threads
-	go fn [mut server] (packet Packet, origin string) {
-		server.mutex.@lock()
-		defer { server.mutex.unlock() }
-		// Send packet to every other connection that is not the original connection
-		for _, mut conn in server.conns {
-			// log.info("Checking mirror at '${conn.get_ip()}'...")
-			if conn.get_ip() == origin { continue } // > Don't send packet to original user
-			conn.send_packet(packet) or {
-				log.warn("Failed to send mirror through server to other connections : ${err}")
-				continue
+pub fn Server.load_list_from_json(data string) ![]Server {
+	raw_data := json.decode[json.Any](data) or { return error("Failed to parse json : ${err}") }
+	mut servers := []Server{}
+	for key, raw_server_data in raw_data.as_map() {
+		server_data := raw_server_data.as_map()
+		title := server_data["title"]    or { return error("Invalid server data : Missing 'title' data") }
+		ip    := server_data["ip"]       or { return error("Invalid server data : Missing 'ip' data") }
+		lat   := server_data["lat"]      or { return error("Invalid server data : Missing 'lat' data") }
+		lon   := server_data["lon"]      or { return error("Invalid server data : Missing 'lon' data") }
+		status:= server_data["status"]   or { return error("Invalid server data : Missing 'status' data") }
+		server := Server{
+			key: key
+			title: title.str()
+			ip: ip.str()
+			lat: lat.f64()
+			lon: lon.f64()
+			status: match status.str() {
+				"offline" { .offline }
+				"live" { .live }
+				"maintenance" { .maintenance }
+				"coming-soon" { .coming_soon }
+				else { return error("Invalid server data : Invalid server status '${status}'") }
 			}
 		}
-		
-		// React to packet on server side
-		if server.on_packet != none {
-			server.on_packet(packet, server.user_data, origin)
-		}
-	}(packet, origin)
-}
-
-pub fn (mut server Server) send_packet(packet Packet) {
-	println("Sending packet")
-	// Lock server connection list
-	server.mutex.@lock()
-	defer { server.mutex.unlock() }
-	
-	// Send packet on seperate threads
-	go fn [mut server] (packet Packet) {
-		// Send packet to every connection
-		for _, mut conn in server.conns {
-			conn.send_packet(packet) or {
-				log.warn("Failed to send packet from server to other connections : ${err}")
-				continue
-			}
-			println("Packet sent")
-		}
-		
-		println("Packet sending process finished")
-	}(packet)
-}
-
-// Closes every connection that the server has
-pub fn (mut server Server) close() ! {
-	server.mutex.@lock()
-	defer { server.mutex.unlock() }
-	
-	for _, mut conn in server.conns {
-		conn.close() or {
-			log.error("Failed to close connection at '${conn.get_ip()}' : ${err}")
-			continue
-		}
+		servers << server
 	}
-	server.conns.clear()
-	
-	server.listener.close() or {
-		log.warn("Failed to close server connection listener : ${err}")
+	return servers
+}
+
+pub fn (mut server Server) update_ping() {
+	if server.status != .live { return }
+	result := os.execute("ping -i 20 ${server.ip}")
+	if result.output.contains("Average = ") {
+		server.ping = result.output.find_between("Average = ", "ms").f64()
+	} else {
+		log.error("Ping to ${server.ip} server '${server.title}' failed : ${result.output}")
 		return
 	}
+	
+	// TODO : Send custom ping packet to server with mirrorlib
 }

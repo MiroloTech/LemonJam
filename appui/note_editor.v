@@ -46,6 +46,8 @@ pub struct NoteEditor {
 	pub:
 	note_inside_drag_dist        f64              = 4.0
 	note_outside_drag_dist       f64              = 12.0
+	scrub_snapping               f64              = 0.5
+	note_snapping                f64              = 0.5
 	
 	mut:
 	panning                      bool
@@ -366,11 +368,12 @@ pub fn (editor NoteEditor) draw_color_selection(mut ui UI) {
 				f32(ui.style.rounding - inset),
 				ui.style.color_panel.get_gx()
 			)
-			ui.draw_rounded_double_striped_rect(
+			ui.draw_rect(
 				pos + Vec2.v(inset),
 				size - Vec2.v(inset * 2.0),
-				ui.style.rounding - inset,
-				color.darken(0.2)
+				radius: ui.style.rounding - inset
+				fill_color: color.darken(0.2)
+				fill_type: .double
 			)
 		}
 	}
@@ -414,7 +417,7 @@ pub fn (editor NoteEditor) draw_tools(mut ui UI) {
 
 pub fn (mut editor NoteEditor) control_notes(mut ui UI, event &gg.Event) ! {
 	mpos := Vec2{event.mouse_x, event.mouse_y}
-	editing_rect := Rect2{a: editor.from + Vec2{editor.piano_width, editor.header_height}, b: editor.from + editor.size - Vec2{editor.piano_width, editor.header_height}}
+	editing_rect := Rect2{a: editor.from + Vec2{editor.piano_width, editor.header_height}, b: editor.from + editor.size - Vec2{editor.piano_width, 0.0}}
 	editor.hovering_note = unsafe { nil }
 	
 	if editing_rect.is_point_inside(mpos) {
@@ -447,8 +450,8 @@ pub fn (mut editor NoteEditor) control_notes(mut ui UI, event &gg.Event) ! {
 			is_mouse_in_rail := rail.a.y <= mpos.y && mpos.y < rail.b.y
 			if is_mouse_in_rail && is_color_selected && !editor.dragging_note_handles {
 				// > Calculate the distance from the mouse to the edges of the note to determine the handles
-				dist_left := fromx - mpos.x
-				dist_right := (fromx + sizex) - mpos.x
+				mut dist_left := fromx - mpos.x
+				mut dist_right := (fromx + sizex) - mpos.x
 				
 				// > Determine which handle to aply to each side
 				if f64_abs(dist_right) <= editor.note_inside_drag_dist || (dist_right < editor.note_outside_drag_dist && dist_right > 0.0) {

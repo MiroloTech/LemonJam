@@ -25,7 +25,7 @@ pub struct ToastStyle {
 	line_width      f64                     = 3.0
 	icon_size       f64                     = 6.0
 	
-	text_color      Color                   = Color.hex("#ff0000")
+	text_color      Color                   = Color.hex("#dddddd")
 	bg_color        Color                   = Color.hex("#333333cc")
 	count_color     Color                   = Color.hex("#888888")
 	
@@ -34,7 +34,7 @@ pub struct ToastStyle {
 	color_warning   Color                   = Color.hex("#ffe176")
 	color_error     Color                   = Color.hex("#ed1c24")
 	
-	font_path       string                  = "${@VMODROOT}/graph/assets/SourceCodePro-Mono.ttf"
+	font_path       string                  = "${@VMODROOT}/uilib/fonts/SourceCodePro-Regular.ttf"
 }
 
 pub struct Toast {
@@ -56,14 +56,12 @@ pub fn (toast Toast) draw(mut ui UI, pos Vec2, opacity f64) {
 	}
 	
 	// Draw BG
-	/*
-	ctx.draw_rounded_rect_filled(
+	ui.ctx.draw_rounded_rect_filled(
 		f32(pos.x - toast.style.width), f32(pos.y),
 		f32(toast.style.width), f32(toast.style.height),
 		f32(toast.style.rounding),
 		toast.style.bg_color.alpha(opacity).get_gx()
 	)
-	*/
 	
 	// Draw Side Line
 	visual.draw_special_rounded_rect_filled(
@@ -87,17 +85,6 @@ pub fn (toast Toast) draw(mut ui UI, pos Vec2, opacity f64) {
 	}
 	
 	// Draw Text
-	/*
-	cfg := gg.TextCfg{
-		family:          toast.style.font_path
-		size:            toast.style.text_size
-		align:           .left
-		vertical_align:  .middle
-		mono:            true
-	}
-	ui.ctx.set_text_cfg(cfg)
-	*/
-	
 	text_pos := Vec2{pos.x - toast.style.width + toast.style.line_width + toast.style.icon_size + toast.style.part_padding * 2.0, pos.y + toast.style.height * 0.5}
 	if toast.count <= 1 {
 		for i, line in toast.msg.split("\n") {
@@ -105,7 +92,7 @@ pub fn (toast Toast) draw(mut ui UI, pos Vec2, opacity f64) {
 				x: int(text_pos.x)
 				y: int(text_pos.y + f64(i) * toast.style.height),
 				text: line
-				color:           Color.hex("#ff0000").get_gx() // TODO : This color attribute not working
+				color:           toast.style.text_color.get_gx() // TODO : This color attribute not working
 				family:          toast.style.font_path
 				size:            toast.style.text_size
 				align:           .left
@@ -119,7 +106,7 @@ pub fn (toast Toast) draw(mut ui UI, pos Vec2, opacity f64) {
 				x: int(text_pos.x + ui.ctx.text_width(count_text))
 				y: int(text_pos.y + f64(i) * toast.style.height)
 				text: line
-				color:           Color.hex("#ff0000").get_gx()
+				color:           toast.style.text_color.get_gx()
 				family:          toast.style.font_path
 				size:            toast.style.text_size
 				align:           .left

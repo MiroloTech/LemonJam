@@ -9,6 +9,7 @@ pub struct Pattern {
 	nid          &NID
 	name         string
 	notes        []&Note
+	color        Color
 	colors       map[voidptr]Color
 	instruments  map[voidptr]&Instrument
 }

@@ -2,6 +2,7 @@ module objs
 
 // TODO : this
 
+@[heap]
 pub struct Sound {
     pub mut:
     name          string

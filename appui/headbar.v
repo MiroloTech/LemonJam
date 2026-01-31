@@ -1,9 +1,10 @@
 module appui
 
 import gg
+import hash
 
 import std.geom2 { Vec2 }
-import uilib { UI, ActionList, Action }
+import uilib { UI, ActionList, Action, Button }
 
 pub struct HeaderAction {
 	pub mut:
@@ -12,6 +13,7 @@ pub struct HeaderAction {
 	tag             string
 	hotkey          string
 	sub_actions     []HeaderAction
+	disabled        bool
 	
 	user_data       voidptr
 	on_selected     ?fn (tag string, user_data voidptr)
@@ -25,6 +27,7 @@ fn (actions []HeaderAction) to_ui_action_list(from Vec2, size Vec2) ActionList {
 			name:           a.name
 			tag:            a.tag
 			hotkey:         a.hotkey
+			disabled:       a.disabled
 			
 			user_data:      a.user_data
 			on_selected:    a.on_selected
@@ -47,6 +50,12 @@ pub struct Header {
 	options         map[string][]HeaderAction
 	action_list     ?ActionList
 	project_name    string              = "unnamed.lmnj*"
+	
+	user_actions    ActionList          = ActionList{}
+	user_btn        Button              = Button{
+		title: "."
+		// This Buttons does NOTHING when pressed
+	}
 }
 
 
@@ -58,10 +67,23 @@ pub fn (mut header Header) init(mut ui UI) {
 	ui.on_mouse_move << fn [mut header] (mut ui UI, mpos Vec2, mdelta Vec2) ! {
 		header.on_mouse_move(mut ui, mpos, mdelta)!
 	}
+	
+	// > Connect hook through ui to update user name
+	ui.hooks["on-username-change"] = fn [mut header, mut ui] (name_ptr voidptr) {
+		name := unsafe { cstring_to_vstring(name_ptr) }
+		header.user_btn.title = if name == "" { "." } else { name.substr(0, 1) }
+		// > Pick random color for user by hashing user name and moduling it down to max len in color list in ui
+		color := ui.style.colors_users[hash.sum64_string(name, 0) % u64(ui.style.colors_users.len)]
+		header.user_btn.color_primary = color
+		header.user_btn.color_secondary = color.darken(0.05)
+	}
+	
+	// Popup user actions on press
+	header.user_btn
 }
 
 
-pub fn (header Header) draw(mut ui UI) {
+pub fn (mut header Header) draw(mut ui UI) {
 	header_width := ui.get_window_size().x
 	
 	// Draw project name
@@ -117,6 +139,14 @@ pub fn (header Header) draw(mut ui UI) {
 		option_x += width
 		i++
 	}
+	
+	// Draw User Button
+	user_btn_size := header.height - ui.style.padding
+	half_padding := ui.style.padding * 0.5
+	header.user_btn.from = ui.top_right() + Vec2{-user_btn_size - half_padding, half_padding}
+	header.user_btn.size = Vec2.v(user_btn_size)
+	header.user_btn.rounding = user_btn_size / 2.0
+	header.user_btn.draw(mut ui)
 }
 
 
@@ -124,6 +154,8 @@ pub fn (mut header Header) event(mut ui UI, event &gg.Event) ! {
 	if header.action_list != none {
 		header.action_list.event(mut ui, event)!
 	}
+	
+	header.user_btn.event2(mut ui, event)!
 }
 
 

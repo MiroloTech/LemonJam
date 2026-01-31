@@ -1,7 +1,8 @@
 module app
 
-import audio.objs { Instrument, Pattern, Effect, Note }
+import audio.objs { Instrument, Pattern, Effect, Note, Track, TrackType }
 import mirrorlib { NID, NIDType }
+import uilib { UI }
 
 import std { Color }
 
@@ -15,6 +16,7 @@ pub struct Project {
 	pub mut:
 	name                        string
 	session                     ?Session
+	user_name                   string                  = "Jason"
 	
 	sample_rate                 u32
 	channels                    u32
@@ -22,7 +24,7 @@ pub struct Project {
 	instruments                 []&Instrument
 	effects                     []&Effect
 	patterns                    []&Pattern
-	
+	tracks                      []&Track
 	
 	// Hooks
 	ui_ptr                      voidptr
@@ -35,13 +37,13 @@ pub fn (project Project) save_to_file(path string) ! {
 }
 
 pub fn (mut project Project) load_from_file(path string) ! {
-	// Load json data
+	// LOAD JSON DATA
 	text := os.read_file(path) or { return error("Failed to open save file : ${err}") }
 	raw_data := json.decode[json.Any](text) or { return error("Failed to load top-most layer of save file : ${err}") }
 	data := raw_data.as_map()
 	project_data := (data["project"] or { return error("Failed to find project data in file") }).as_map()
 	
-	// Check compatibillity
+	// CHECK COMPATIBILITY
 	version_str := get_app_version()
 	version := semver.from(version_str) or {
 		return error("Application is at invalid version : ${version_str}")
@@ -56,11 +58,11 @@ pub fn (mut project Project) load_from_file(path string) ! {
 		log.warn("Save file version is less than the current application version")
 	}
 	
-	// Load basic settings
+	// LOAD BASIC SETTINGS
 	project.sample_rate = (project_data["sample-rate"] or { 44100 }).u32()
 	project.channels = (project_data["channels"] or { 2 }).u32()
 	
-	// Load instruments
+	// LOAD INSTRUMENTS
 	instruments := data["instruments"] or { []json.Any{} }
 	for instrument_id, raw_instrument_data in instruments.arr() {
 		instrument_data := raw_instrument_data.as_map()
@@ -71,11 +73,13 @@ pub fn (mut project Project) load_from_file(path string) ! {
 		}
 	}
 	
-	// Load patterns
+	// LOAD PATTERNS
 	patterns := data["patterns"] or { []json.Any{} }
 	for raw_pattern_data in patterns.arr() {
 		pattern_data := raw_pattern_data.as_map()
-		mut pattern := project.new_pattern((pattern_data["name"] or { "unnamed" }).str())
+		name_data := (pattern_data["name"] or { "unnamed" }).str()
+		color_data := Color.hex((pattern_data["color"] or { "#fff0000" }).str())
+		mut pattern := project.new_pattern(name_data, color_data)
 		
 		// > Parse notes
 		raw_notes := pattern_data["notes"] or { return error("Failed to find property 'notes' in save file") }
@@ -121,6 +125,35 @@ pub fn (mut project Project) load_from_file(path string) ! {
 		}
 	}
 	
+	// LOAD TRACKS
+	tracks := data["tracks"] or { []json.Any{} }.arr()
+	for raw_track_data in tracks {
+		track_data := raw_track_data.as_map()
+		track_title := track_data["title"] or { "unnamed" }.str()
+		track_type_str := track_data["type"] or { return error("No 'track-type' given in track ${track_title}") }.str()
+		track_typ := TrackType.from_str(track_type_str) or { return error("Invalid track type found in track ${track_data} : ${err}") }
+		
+		mut track := project.new_track(track_title, track_typ) or { return error("Failed to create new track object in project : ${err}") }
+		match track_typ {
+			.pattern {
+				raw_elements := (track_data["elements"] or { break }).arr()
+				for raw_element in raw_elements {
+					element_data := raw_element.as_map()
+					from := element_data["from"]     or { continue }.f64()
+					len := element_data["len"]       or { continue }.f64()
+					id := element_data["element-id"] or { continue }.int()
+					
+					pattern := project.patterns[id]  or { continue }
+					track.add_element(pattern, from, len)
+				}
+			}
+			else {  }
+		}
+		
+		// TODO : Implement sounds & animations
+		
+	}
+	
 	// TODO : The rest...
 }
 
@@ -147,9 +180,10 @@ pub fn (mut project Project) unlock_nid(mut nid &NID) {
 // ===== EDITOR CONTROLS =====
 
 // Creates a new pattern and mirrors that in the seesion
-pub fn (mut project Project) new_pattern(name string) &Pattern {
+pub fn (mut project Project) new_pattern(name string, color Color) &Pattern {
 	mut pattern := &Pattern{
 		name: name
+		color: color
 		notes: []
 		nid: project.new_nid(.pattern)
 	}
@@ -166,13 +200,28 @@ pub fn (mut project Project) new_instrument(file string, json_data string) !&Ins
 	mut instrument := &Instrument{
 		name: file.all_before_last(".").title()
 		nid: project.new_nid(.instrument)
-		
 	}
 	instrument.load() or {
 		return error("Failed to create new instrument : ${err}")
 	}
 	project.instruments << instrument
 	return instrument
+}
+
+pub fn (mut project Project) new_track(title string, typ TrackType) !&Track {
+	mut track := &Track{
+		title: title
+		nid: project.new_nid(.track)
+	}
+	project.tracks << track
+	return track
+}
+
+
+pub fn (mut project Project) update_ui_from_save_file(mut ui UI) {
+	for pattern in project.patterns {
+		ui.call_hook("add-to-pattern-list", pattern) or {  }
+	}
 }
 
 
@@ -184,3 +233,4 @@ pub fn get_app_version() string {
 	vmod := @VMOD_FILE
 	return vmod.find_between("version: '", "'")
 }
+

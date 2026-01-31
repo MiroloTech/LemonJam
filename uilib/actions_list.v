@@ -12,6 +12,7 @@ pub struct Action {
 	tag              string
 	hotkey           string
 	sub_actions      []Action
+	disabled         bool
 	
 	user_data       voidptr
 	on_selected     ?fn (tag string, user_data voidptr)
@@ -84,7 +85,7 @@ pub fn (al ActionList) draw(mut ui UI) {
 			y += ui.style.seperator_height
 		} else {
 			// > Draw hover background
-			if i == al.action_hovered {
+			if i == al.action_hovered && !action.disabled {
 				ui.ctx.draw_rect_filled(
 					f32(from.x), f32(y),
 					f32(al.size.x), f32(f64(ui.style.font_size) + ui.style.list_gap),
@@ -96,7 +97,7 @@ pub fn (al ActionList) draw(mut ui UI) {
 			ui.ctx.draw_text(
 				int(from.x + ui.style.padding), int(y + f64(ui.style.font_size) * 0.5 + 2.0),
 				action.name,
-				color: ui.style.color_text.get_gx()
+				color: if action.disabled { ui.style.color_grey.get_gx() } else { ui.style.color_text.get_gx() }
 				size: ui.style.font_size
 				align: .left
 				vertical_align: .middle
@@ -135,7 +136,7 @@ pub fn (mut al ActionList) event(mut ui UI, event &gg.Event) ! {
 			y += ui.style.seperator_height
 		} else {
 			height := f64(ui.style.font_size) + ui.style.list_gap
-			if from.x <= mpos.x && mpos.x < from.x + al.size.x  &&  y <= mpos.y && mpos.y < y + height {
+			if from.x <= mpos.x && mpos.x < from.x + al.size.x  &&  y <= mpos.y && mpos.y < y + height  &&  !action.disabled {
 				al.action_hovered = i
 			}
 			

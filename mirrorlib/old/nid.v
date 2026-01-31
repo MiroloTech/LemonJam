@@ -6,7 +6,6 @@ pub enum NIDType {
 	pattern
 	instrument
 	effect
-	track
 }
 
 @[heap]

@@ -11,6 +11,7 @@ pub enum ButtonType {
 	grey
 	text
 	flat
+	dark
 }
 
 // TODO: Add icon support
@@ -33,6 +34,7 @@ pub struct Button {
 	color_primary    ?Color
 	color_secondary  ?Color
 	font_size        ?int
+	rounding         ?f64
 }
 
 pub fn (btn Button) draw(mut ui UI) {
@@ -51,6 +53,7 @@ pub fn (btn Button) draw(mut ui UI) {
 			.solid { btn.draw_solid(mut ui) }
 			.outline { btn.draw_outline(mut ui) }
 			.grey { btn.draw_grey(mut ui) }
+			.dark { btn.draw_dark(mut ui) }
 			.text {
 				color_main := btn.color_primary or { ui.style.color_text }
 				color_hovered := btn.color_secondary or { ui.style.color_text }
@@ -133,10 +136,11 @@ pub fn (mut btn Button) event2(mut ui UI, event &gg.Event) ! {
 
 fn (btn Button) draw_solid(mut ui UI) {
 	color := if btn.is_hovered && !btn.disabled { btn.color_secondary or { ui.style.color_primary_dark } } else { btn.color_primary or { ui.style.color_primary } }
+	rounding := if btn.rounding != none { btn.rounding } else { ui.style.rounding }
 	ui.ctx.draw_rounded_rect_filled(
 		f32(btn.from.x), f32(btn.from.y),
 		f32(btn.size.x), f32(btn.size.y),
-		f32(ui.style.rounding),
+		f32(rounding),
 		color.get_gx()
 	)
 	
@@ -146,12 +150,13 @@ fn (btn Button) draw_solid(mut ui UI) {
 
 fn (btn Button) draw_outline(mut ui UI) {
 	color := if btn.is_hovered && !btn.disabled { btn.color_secondary or { ui.style.color_primary_dark } } else { btn.color_primary or { ui.style.color_primary } }
+	rounding := if btn.rounding != none { btn.rounding } else { ui.style.rounding }
 	
 	// Outline
 	ui.ctx.draw_rounded_rect_filled(
 		f32(btn.from.x), f32(btn.from.y),
 		f32(btn.size.x), f32(btn.size.y),
-		f32(ui.style.rounding),
+		f32(rounding),
 		color.get_gx()
 	)
 	
@@ -159,7 +164,7 @@ fn (btn Button) draw_outline(mut ui UI) {
 	ui.ctx.draw_rounded_rect_filled(
 		f32(btn.from.x + ui.style.outline_size),       f32(btn.from.y + ui.style.outline_size),
 		f32(btn.size.x - ui.style.outline_size * 2.0), f32(btn.size.y - ui.style.outline_size * 2.0),
-		f32(ui.style.rounding - ui.style.outline_size),
+		f32(rounding - ui.style.outline_size),
 		ui.style.color_panel.get_gx()
 	)
 	
@@ -169,10 +174,25 @@ fn (btn Button) draw_outline(mut ui UI) {
 
 fn (btn Button) draw_grey(mut ui UI) {
 	color := if btn.is_hovered && !btn.disabled { ui.style.color_panel.brighten(0.1) } else { ui.style.color_panel }
+	rounding := if btn.rounding != none { btn.rounding } else { ui.style.rounding }
 	ui.ctx.draw_rounded_rect_filled(
 		f32(btn.from.x), f32(btn.from.y),
 		f32(btn.size.x), f32(btn.size.y),
-		f32(ui.style.rounding),
+		f32(rounding),
+		color.get_gx()
+	)
+	
+	// Text
+	btn.draw_btn_text(btn.title, mut ui)
+}
+
+fn (btn Button) draw_dark(mut ui UI) {
+	color := if btn.is_hovered && !btn.disabled { btn.color_secondary or { ui.style.color_grey } } else { btn.color_primary or { ui.style.color_bg } }
+	rounding := if btn.rounding != none { btn.rounding } else { ui.style.rounding }
+	ui.ctx.draw_rounded_rect_filled(
+		f32(btn.from.x), f32(btn.from.y),
+		f32(btn.size.x), f32(btn.size.y),
+		f32(rounding),
 		color.get_gx()
 	)
 	

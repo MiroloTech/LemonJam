@@ -8,6 +8,7 @@
     "patterns": [
         {
             "name": "Chords",
+            "color": "#ff8383",
             "notes": [
                 "C#3,0.0-4.0",
                 "C#4,0.0-4.0",
@@ -41,6 +42,7 @@
         },
         {
             "name": "Bass",
+            "color": "#32a783",
             "notes": [
                 "C#3,0.0-4.0",
                 "C#3,4.0-4.0",
@@ -72,6 +74,55 @@
                 "amplitude": 1.0,
                 "wave-shape": "saw"
             }
+        }
+    ],
+    "tracks": [
+        {
+            "title": "Backing",
+            "type": "pattern",
+            "elements": [
+                {
+                    "from": 0.0,
+                    "len": 4.0,
+                    "element-id": 0
+                },
+                {
+                    "from": 4.0,
+                    "len": 4.0,
+                    "element-id": 0
+                },
+                {
+                    "from": 8.0,
+                    "len": 4.0,
+                    "element-id": 0
+                },
+                {
+                    "from": 12.0,
+                    "len": 4.0,
+                    "element-id": 0
+                }
+            ]
+        },
+        {
+            "title": "Bass",
+            "type": "pattern",
+            "elements": [
+                {
+                    "from": 4.0,
+                    "len": 4.0,
+                    "element-id": 1
+                },
+                {
+                    "from": 8.0,
+                    "len": 4.0,
+                    "element-id": 1
+                },
+                {
+                    "from": 12.0,
+                    "len": 4.0,
+                    "element-id": 1
+                }
+            ]
         }
     ]
 }
