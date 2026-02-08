@@ -24,6 +24,7 @@ pub struct Timeline {
 	folder_height           f64                            = 25.0
 	min_note_range          int                            = 8
 	note_edge_spacing       f64                            = 10.0
+	collapsed_track_height  f64                            = 28.0
 	
 	// Timline Elements
 	timeline_elements       []TimelineElement
@@ -43,7 +44,7 @@ pub struct TrackUI {
 	pub mut:
 	track                   &Track
 	title_edit              LineEdit
-	collapsed               bool
+	collapsed               bool //                           = true
 }
 
 
@@ -75,9 +76,9 @@ pub fn (mut timeline Timeline) draw_tracks(mut ui UI) {
 	mut y := timeline.header_height + ui.style.padding
 	for mut element in timeline.timeline_elements {
 		from := timeline.from + Vec2{ui.style.padding, y}
-		if element is TrackUI {
+		if mut element is TrackUI {
 			timeline.draw_track(mut ui, from, mut element as TrackUI)
-			y += timeline.scaling.y + ui.style.padding
+			y += if element.collapsed { timeline.collapsed_track_height } else { timeline.scaling.y } + ui.style.padding
 		} else {
 			timeline.draw_track_folder(mut ui, from, element as TrackFolder)
 			y += timeline.folder_height + ui.style.padding
@@ -88,7 +89,7 @@ pub fn (mut timeline Timeline) draw_tracks(mut ui UI) {
 
 
 pub fn (timeline Timeline) draw_track(mut ui UI, from Vec2, mut track TrackUI) {
-	track_height := timeline.scaling.y
+	track_height := if track.collapsed { timeline.collapsed_track_height } else { timeline.scaling.y }
 	
 	// Dra Track BG
 	ui.draw_rect(
@@ -118,6 +119,25 @@ pub fn (timeline Timeline) draw_track(mut ui UI, from Vec2, mut track TrackUI) {
 	track.title_edit.size = Vec2{timeline.track_head_width - ui.style.padding * 3.0, f64(ui.style.font_size) + 2.0}
 	track.title_edit.draw(mut ui)
 	
+	// Draw Collapse Icon
+	collapse_icon_size := 18.0
+	collapse_icon_pos := from + Vec2{timeline.track_head_width - collapse_icon_size - ui.style.padding * 2.0, ui.style.padding}
+	if track.collapsed {
+		ui.draw_icon(
+			"point-right",
+			collapse_icon_pos,
+			Vec2.v(collapse_icon_size),
+			ui.style.color_text
+		)
+	} else {
+		ui.draw_icon(
+			"point-down",
+			collapse_icon_pos,
+			Vec2.v(collapse_icon_size),
+			ui.style.color_text
+		)
+	}
+	
 	// Draw Track Elements
 	for element in track.track.elements {
 		// > Draw base BG
@@ -142,6 +162,8 @@ pub fn (timeline Timeline) draw_track(mut ui UI, from Vec2, mut track TrackUI) {
 		)
 		
 		// > Draw preview
+		if track.collapsed { continue }
+		
 		if element.obj is Pattern {
 			// >> Collect note range
 			mut min_note := -1

@@ -25,6 +25,7 @@ pub struct UI {
 	cursor              sapp.MouseCursor      = .default
 	icons               map[string]&gg.Image
 	not_found_icon      &gg.Image             = unsafe { nil }
+	mpos                Vec2                  = Vec2.zero()
 	
 	hooks               map[string]Hook
 	
@@ -106,6 +107,10 @@ pub fn (mut ui UI) draw() {
 }
 
 pub fn (mut ui UI) event(event &gg.Event) ! {
+	// Update UI
+	ui.mpos = Vec2{event.mouse_x, event.mouse_y}
+	
+	// Recreate event in own system
 	ui_event := Event{
 		frame_count:    event.frame_count
 		typ:            event.typ

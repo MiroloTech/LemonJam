@@ -4,7 +4,7 @@ import gg
 
 import std.geom2 { Vec2 }
 import std { Color }
-import uilib { UI, Button }
+import uilib { UI, Button, FooterHook }
 
 /*
 The Browser panel allows you to load isntruments, sounds and effects into the project by right-clicking and selecting "Add to Rack"

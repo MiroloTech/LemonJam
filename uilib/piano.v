@@ -146,6 +146,17 @@ pub fn (piano Piano) get_piano_rails(from Vec2, size Vec2) []Rect2 {
 	return rails.reverse()
 }
 
+pub fn (piano Piano) get_rail_id(y f64, from Vec2, size Vec2) int {
+	mut closest_rail := 0
+	rails := piano.get_piano_rails(from, size).reverse() 
+	for i, rail in rails {
+		if rail.a.y < y {
+			closest_rail = rails.len - 1 - i
+		} else { break }
+	}
+	return closest_rail
+}
+
 
 pub fn (piano Piano) total_piano_height() f64 {
 	octaves := int(floor(f64(piano.note_count) / 12.0))

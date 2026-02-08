@@ -4,7 +4,7 @@ import gg
 import sokol.sapp
 
 import std.geom2 { Vec2 }
-import uilib { UI, ActionList, Action }
+import uilib { UI, ActionList, Action, FooterHook }
 
 /*
 The Footer (or footer bar) shows possible actions or action descriptions, you can perform within the editor context.
@@ -61,10 +61,4 @@ pub fn (mut footer Footer) display_until(msg string, event_typ sapp.EventType) {
 pub fn (mut footer Footer) display_until_hook(data_src voidptr) {
 	data := unsafe { &FooterHook(data_src) }
 	footer.display_until(data.msg, data.event_typ)
-}
-
-pub struct FooterHook {
-	pub:
-	event_typ    sapp.EventType    = .mouse_down
-	msg          string
 }

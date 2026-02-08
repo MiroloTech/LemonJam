@@ -4,11 +4,13 @@ import gg
 import math { floor, ceil, mod }
 import log
 
+import appui.tools { NoteEditorTool, ToolSelectNotes, ToolMoveNotes, ToolCutNotes, ToolPlaceNotes }
 import audio.objs { Note, Pattern }
 import std { Color }
 import std.geom2 { Vec2, Rect2 }
-import uilib { UI, ActionList, Piano }
+import uilib { UI, ActionList, Piano, NoteUI }
 
+@[heap]
 pub struct NoteEditor {
 	pub mut:
 	from                         Vec2
@@ -30,11 +32,16 @@ pub struct NoteEditor {
 	selected_color               int
 	hovering_color               int              = -1
 	
+	/*
 	notes                        []&Note          = []
 	selected_notes               []&Note
 	hovering_note                &Note            = unsafe { nil }
 	left_handles                 []&Note
 	right_handles                []&Note
+	*/
+	notes                        []&NoteUI       = []
+	
+	// TODO : Add lambdas to tools to allow for ntoe-space to world-space and world-space to note-space conversions
 	
 	playhead_pos                 f64
 	hovering_playhead            bool
@@ -42,6 +49,14 @@ pub struct NoteEditor {
 	
 	piano                        Piano            = Piano{}
 	piano_width                  f64              = 180.0
+	
+	tools                        []NoteEditorTool = [
+		ToolSelectNotes{},
+		ToolMoveNotes{},
+		ToolPlaceNotes{},
+		ToolCutNotes{},
+	]
+	selected_tool                int              = 1
 	
 	pub:
 	note_inside_drag_dist        f64              = 4.0
@@ -72,17 +87,12 @@ pub fn (mut editor NoteEditor) draw(mut ui UI) {
 	editor.draw_tools(mut ui)
 	editor.draw_playhead(mut ui)
 	
-	
 	// Update mouse
 	if editor.panning {
 		ui.cursor = .resize_all
 	} else if editor.hovering_color != -1 {
 		ui.cursor = .pointing_hand
 	} else if editor.hovering_playhead {
-		ui.cursor = .pointing_hand
-	} else if editor.left_handles.len > 0 || editor.right_handles.len > 0 {
-		ui.cursor = .resize_ew
-	} else if editor.hovering_note != unsafe { nil } {
 		ui.cursor = .pointing_hand
 	}
 	
@@ -93,16 +103,9 @@ pub fn (mut editor NoteEditor) event(mut ui UI, event &gg.Event) ! {
 	mpos := Vec2{event.mouse_x, event.mouse_y}
 	is_inside_window := Rect2.from_size(editor.from, editor.size).is_point_inside(mpos)
 	
-	/*
-	// Generalized release events
-	if event.typ == .mouse_up {
-		editor.dragging_playhead = false
-	}
-	*/
-	
 	// Control headbar events
 	editor.control_playhead(mut ui, event)!
-	
+	editor.control_tool_bar(mut ui, event)!
 	
 	// Select Color
 	editor.hovering_color = -1
@@ -120,7 +123,7 @@ pub fn (mut editor NoteEditor) event(mut ui UI, event &gg.Event) ! {
 	}
 	
 	// Control note-specific events
-	editor.control_notes(mut ui, event)!
+	// editor.control_notes(mut ui, event)!
 	
 	// Move piano preview around
 	if is_inside_window && event.typ == .mouse_scroll {
@@ -144,7 +147,7 @@ pub fn (mut editor NoteEditor) event(mut ui UI, event &gg.Event) ! {
 		editor.panning = false
 		return uilib.surpress_event()
 	}
-		
+	
 	// > Clamp scrolling
 	if editor.scroll_x < 0.0 { editor.scroll_x = 0.0 }
 	if editor.scroll_y < 0.0 { editor.scroll_y = 0.0 }
@@ -155,7 +158,15 @@ pub fn (mut editor NoteEditor) event(mut ui UI, event &gg.Event) ! {
 	if editor.panning || (is_inside_window && event.typ == .mouse_scroll) {
 		return uilib.surpress_event()
 	}
+	
+	// Control tools
+	editor_rect := Rect2{editor.from + Vec2{0.0, editor.header_height}, editor.from + editor.size}
+	if editor_rect.is_point_inside(ui.mpos) || event.typ == .mouse_up {
+		editor.tools[editor.selected_tool].on_ui_event(mut ui, event)
+	}
 }
+
+
 
 pub fn (mut editor NoteEditor) draw_piano(mut ui UI, from Vec2, size Vec2) {
 	// Draw piano
@@ -187,82 +198,27 @@ pub fn (mut editor NoteEditor) draw_piano(mut ui UI, from Vec2, size Vec2) {
 }
 
 
-pub fn (editor NoteEditor) draw_notes(mut ui UI) {
+pub fn (mut editor NoteEditor) draw_notes(mut ui UI) {
 	rect := Rect2{a: editor.from + Vec2{editor.piano_width, editor.header_height}, b: editor.from + editor.size - Vec2{editor.piano_width, editor.header_height}}
 	ui.push_scissor(rect)
 	rails := editor.piano.get_piano_rails(rect.a + Vec2{editor.piano.size.x, 0.0}, rect.size())
 	
-	for note in editor.pattern.notes {
-		color := editor.pattern.colors[note] or { Color.hex("#ffffff") }
-		rail_id := int(note.id)
-		rail := rails[rail_id] or {
-			log.warn("Tried to draw note out of range : ${note}")
+	for mut note_ui in editor.notes {
+		// > Move and resize note into rails
+		rail := rails[int(note_ui.note.id)] or {
+			log.warn("Tried to draw note out of range : ${note_ui}")
 			continue
 		}
+		fromx := editor.from.x + editor.piano_width + note_ui.note.from * editor.pixels_per_beat - editor.scroll_x
+		sizex := note_ui.note.len * editor.pixels_per_beat
 		
-		// TODO : Draw curved notes properly ( maybe with a pretty little shadow, when two notes cross )
+		note_ui.from = Vec2{fromx, rail.a.y}
+		note_ui.size = Vec2{sizex, rail.size().y}
 		
-		fromx := editor.from.x + editor.piano_width + note.from * editor.pixels_per_beat - editor.scroll_x
-		sizex := note.len * editor.pixels_per_beat
-		
-		is_color_selected := editor.colors[editor.selected_color] == color
-		if is_color_selected {
-			if editor.selected_notes.contains(note) {
-				ui.draw_rect(
-					Vec2{fromx, rail.a.y},
-					Vec2{sizex, rail.size().y},
-					
-					radius: ui.style.rounding
-					fill_color: color
-					
-					outline_color: ui.style.color_text
-					outline: 4.0
-				)
-			} else {
-				ui.draw_rect(
-					Vec2{fromx, rail.a.y},
-					Vec2{sizex, rail.size().y},
-					
-					radius: ui.style.rounding
-					fill_color: color
-				)
-			}
-						
-			// > Draw handle
-			handle_inset := 3.0
-			if note in editor.left_handles {
-				ui.draw_rect(
-					Vec2{fromx + handle_inset, rail.a.y + handle_inset},
-					Vec2{4.0, rail.size().y - handle_inset * 2.0},
-					
-					radius: ui.style.rounding - handle_inset
-					fill_color: ui.style.color_text
-				)
-			}
-			if note in editor.right_handles {
-				ui.draw_rect(
-					Vec2{fromx + sizex - handle_inset - 4.0, rail.a.y + handle_inset},
-					Vec2{4.0, rail.size().y - handle_inset * 2.0},
-					
-					radius: ui.style.rounding - handle_inset
-					fill_color: ui.style.color_text
-				)
-			}
-		} else {
-			// > Draw un-focused notes
-			inset := 2.0
-			ui.draw_rect(
-				Vec2{fromx, rail.a.y},
-				Vec2{sizex, rail.size().y},
-				
-				radius: ui.style.rounding
-				inset: inset
-				fill_color: color
-				fill_type: .double
-				outline: inset
-				outline_color: if editor.selected_notes.contains(note) { ui.style.color_text } else { color }
-			)
-		}
+		// > Draw Note
+		is_hashed := note_ui.color != editor.colors[editor.selected_color] or { Color.hex("#ffffff") }
+		note_ui.is_colored = !is_hashed
+		note_ui.draw(mut ui, is_hashed)
 	}
 	
 	ui.pop_scissor()
@@ -382,7 +338,7 @@ pub fn (editor NoteEditor) draw_color_selection(mut ui UI) {
 
 
 // Presents all headbar data except for the bar line counter ( handelerd in draw_bar_lines )
-pub fn (editor NoteEditor) draw_tools(mut ui UI) {
+pub fn (mut editor NoteEditor) draw_tools(mut ui UI) {
 	// Draw vertical split line
 	ui.ctx.draw_line(
 		f32(editor.from.x),                 f32(editor.from.y + editor.header_height * 0.5),
@@ -408,6 +364,43 @@ pub fn (editor NoteEditor) draw_tools(mut ui UI) {
 		vertical_align: .middle
 		family: ui.style.font_regular
 	)
+	
+	// Draw list of tools
+	mut tool_position := editor.from + Vec2.v(ui.style.padding)
+	tool_size := Vec2.v(editor.header_height * 0.5 - ui.style.padding * 2.0)
+	tool_icon_padding := 2.0
+	for i, mut tool in editor.tools {
+		// > Draw tool icon
+		ui.draw_icon(
+			tool.icon,
+			tool_position + Vec2.v(tool_icon_padding),
+			tool_size - Vec2.v(tool_icon_padding * 2.0),
+			if editor.selected_tool == i { tool.color } else { ui.style.color_grey }
+		)
+		
+		// > Update mouse cursor
+		if Rect2.from_size(tool_position, tool_size).is_point_inside(ui.mpos) {
+			ui.cursor = .pointing_hand
+		}
+		
+		// > Move next tool position
+		tool_position.x += tool_size.x + ui.style.padding
+	}
+	
+	// Update note_uis list for current tool
+	editor.tools[editor.selected_tool].note_uis = editor.notes
+	
+	editor_rect := Rect2{editor.from + Vec2{editor.piano.size.x, editor.header_height}, editor.from + editor.size}
+	
+	// Call draw function on selected tool
+	ui.push_scissor(editor_rect)
+	editor.tools[editor.selected_tool].draw(mut ui)
+	ui.pop_scissor()
+	
+	if editor_rect.is_point_inside(ui.mpos) {
+		// Update cursor defined by current tool
+		ui.cursor = editor.tools[editor.selected_tool].get_cursor()
+	}
 }
 
 
@@ -415,6 +408,7 @@ pub fn (editor NoteEditor) draw_tools(mut ui UI) {
 
 // ========== EVENT CONTROLS ==========
 
+/*
 pub fn (mut editor NoteEditor) control_notes(mut ui UI, event &gg.Event) ! {
 	mpos := Vec2{event.mouse_x, event.mouse_y}
 	editing_rect := Rect2{a: editor.from + Vec2{editor.piano_width, editor.header_height}, b: editor.from + editor.size - Vec2{editor.piano_width, 0.0}}
@@ -502,6 +496,8 @@ pub fn (mut editor NoteEditor) control_notes(mut ui UI, event &gg.Event) ! {
 	}
 }
 
+*/
+
 
 pub fn (mut editor NoteEditor) control_playhead(mut ui UI, event &gg.Event) ! {
 	mpos := Vec2{event.mouse_x, event.mouse_y}
@@ -566,10 +562,49 @@ pub fn (mut editor NoteEditor) control_playhead(mut ui UI, event &gg.Event) ! {
 	}
 }
 
+pub fn (mut editor NoteEditor) control_tool_bar(mut ui UI, event &gg.Event) ! {
+	if event.typ != .mouse_down { return }
+	
+	// Control list of tools
+	mut tool_position := editor.from + Vec2.v(ui.style.padding)
+	tool_size := Vec2.v(editor.header_height * 0.5 - ui.style.padding * 2.0)
+	for i, _ in editor.tools {
+		// > Update selected tool on click
+		if Rect2.from_size(tool_position, tool_size).is_point_inside(ui.mpos) {
+			editor.selected_tool = i
+		}
+		
+		// > Move next tool position
+		tool_position.x += tool_size.x + ui.style.padding
+	}
+}
+
 
 pub fn (mut editor NoteEditor) open_pattern(pattern &Pattern) {
 	editor.pattern = pattern
-	editor.notes = pattern.notes
+	editor.notes = NoteUI.from_pattern(pattern)
+}
+
+pub fn (mut editor NoteEditor) init_tools() {
+	for mut tool in editor.tools {
+		tool.conv_world2note = fn [mut editor] (pos Vec2) (f64, int) {
+			rect := Rect2{editor.from + Vec2{editor.piano_width, editor.header_height}, editor.from + editor.size - Vec2{editor.piano_width, editor.header_height}}
+			fromx := (pos.x - editor.from.x - editor.piano_width + editor.scroll_x) / editor.pixels_per_beat
+			rail_id := editor.piano.get_rail_id(pos.y, rect.a + Vec2{editor.piano_width, 0.0}, rect.size())
+			return fromx, rail_id
+		}
+		tool.conv_note2world = fn [mut editor] (time f64, id int) Vec2 {
+			rect := Rect2{editor.from + Vec2{editor.piano_width, editor.header_height}, editor.from + editor.size - Vec2{editor.piano_width, editor.header_height}}
+			rails := editor.piano.get_piano_rails(rect.a + Vec2{editor.piano_width, 0.0}, rect.size())
+			
+			rail := rails[id] or {
+				return Vec2.zero()
+			}
+			
+			fromx := editor.from.x + editor.piano_width + time * editor.pixels_per_beat - editor.scroll_x
+			return Vec2{fromx, rail.a.y}
+		}
+	}
 }
 
 
