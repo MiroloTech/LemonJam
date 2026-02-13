@@ -1,7 +1,7 @@
 module app
 
 import audio.objs { Instrument, Pattern, Effect, Note, Track, TrackType }
-import mirrorlib { NID, NIDType }
+import mirrorlib { NID, NIDType, Server }
 import uilib { UI }
 
 import std { Color }
@@ -222,6 +222,13 @@ pub fn (mut project Project) update_ui_from_save_file(mut ui UI) {
 	for pattern in project.patterns {
 		ui.call_hook("add-to-pattern-list", pattern) or {  }
 	}
+}
+
+
+// ========== SESSION CONTROLS ==========
+
+pub fn (mut project Project) start_session(server Server) ! {
+	log.info("Starting new session at server ${server.title}...")
 }
 
 

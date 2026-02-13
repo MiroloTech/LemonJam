@@ -62,7 +62,7 @@ pub struct Header {
 pub fn (mut header Header) init(mut ui UI) {
 	// Connect event hooks
 	ui.on_mouse_down << fn [mut header] (mut ui UI, mpos Vec2) ! {
-		header.on_mouse_down(mut ui, mpos)!
+		// header.on_mouse_down(mut ui, mpos)!
 	}
 	ui.on_mouse_move << fn [mut header] (mut ui UI, mpos Vec2, mdelta Vec2) ! {
 		header.on_mouse_move(mut ui, mpos, mdelta)!
@@ -151,30 +151,46 @@ pub fn (mut header Header) draw(mut ui UI) {
 
 
 pub fn (mut header Header) event(mut ui UI, event &gg.Event) ! {
+	header.user_btn.event2(mut ui, event)!
+	
+	mut surpress_later := false
+	mut close_action_list := false
+	if event.typ == .mouse_down && event.mouse_button == .left {
+		if header.option_hovered != -1 {
+			header.option_open = header.option_hovered
+			option_tag := header.options.keys()[header.option_hovered] or { return }
+			x, _ := header.get_option_dimensions(ui, header.option_open)
+			header.action_list = (header.options[option_tag] or { return }).to_ui_action_list(
+				Vec2{x, header.height},
+				Vec2{160.0, 0.0}
+			)
+		} else {
+			if header.action_list != none {
+				if header.action_list.action_hovered != -1 {
+					surpress_later = true
+				}
+			}
+			header.option_open = -1
+			close_action_list = true
+		}
+	}
+	
 	if header.action_list != none {
+		// println(event.typ)
 		header.action_list.event(mut ui, event)!
 	}
 	
-	header.user_btn.event2(mut ui, event)!
+	if close_action_list {
+		header.action_list = none
+	}
+	
+	if surpress_later {
+		return uilib.surpress_event()
+	}
 }
 
 
 // ===== EVENT HOOKS =====
-
-pub fn (mut header Header) on_mouse_down(mut ui UI, _ Vec2) ! {
-	if header.option_hovered != -1 {
-		header.option_open = header.option_hovered
-		option_tag := header.options.keys()[header.option_hovered] or { return }
-		x, _ := header.get_option_dimensions(ui, header.option_open)
-		header.action_list = (header.options[option_tag] or { return }).to_ui_action_list(
-			Vec2{x, header.height},
-			Vec2{160.0, 0.0}
-		)
-	} else {
-		header.option_open = -1
-		header.action_list = none
-	}
-}
 
 pub fn (mut header Header) on_mouse_move(mut ui UI, mpos Vec2, _ Vec2) ! {
 	header.option_hovered = -1

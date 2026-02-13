@@ -57,8 +57,17 @@ pub fn (mut win Window) init(mut ui UI) {
 		HeaderAction{ name: "Undo"          hotkey: "Ctrl+Z" },
 		HeaderAction{ name: "Redo"          hotkey: "Ctrl+Y" },
 	]
+	
 	win.header.options["Session"] = [
-		HeaderAction{ name: "Start Session" }
+		HeaderAction{ name: "Start Session"                                 on_selected: fn [mut win] (_ string, ui_ptr voidptr) {
+			mut ui := unsafe { &UI(ui_ptr) }
+			ui.popups << NewSessionPopup.new(
+				mut ui,
+				ui.top_left() + Vec2.v(60),
+				ui.bottom_right() - Vec2.v(120),
+				mut win.project
+			)
+		} user_data: mut ui }
 		HeaderAction{ name: "Stop Session"  disabled: true }
 	]
 	win.header.init(mut ui)

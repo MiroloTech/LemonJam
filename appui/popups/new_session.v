@@ -24,7 +24,7 @@ pub struct NewSessionPopup {
 	servers         shared []Server
 	
 	hovering_server int                     = -1
-	selected_server int
+	selected_server int                     = -1
 	
 	earth_shape     []Tri2
 	lakes_shape     []Tri2
@@ -37,11 +37,12 @@ pub struct NewSessionPopup {
 	cancel_btn      Button
 }
 
-pub fn NewSessionPopup.new(ui UI, from Vec2, size Vec2, mut project Project) NewSessionPopup {
+pub fn NewSessionPopup.new(mut ui UI, from Vec2, size Vec2, mut project Project) NewSessionPopup {
 	earth_shape, lakes_shape := triangulate_world_map()
 	mut popup := NewSessionPopup{
 		from: from
 		size: size
+		
 		project: project
 		
 		earth_shape: earth_shape
@@ -60,6 +61,7 @@ pub fn NewSessionPopup.new(ui UI, from Vec2, size Vec2, mut project Project) New
 			title: "Cancel"
 		}
 	}
+	
 	spawn fn (mut popup NewSessionPopup) {
 		// TODO : Create a footer message here
 		popup.fetch_servers()
@@ -74,7 +76,7 @@ pub fn (mut popup NewSessionPopup) draw(mut ui UI) {
 	popup.from = Vec2.v(window_padding)
 	popup.size = ui.get_window_size() - Vec2.v(window_padding * 2.0)
 	popup.world_from = popup.from + Vec2.v(ui.style.strong_padding)
-	popup.world_size = popup.size - Vec2.v(ui.style.strong_padding * 2.0) - Vec2{0.0, popup.bar_height + ui.style.strong_padding * 2.0}
+	popup.world_size = popup.size - Vec2.v(ui.style.strong_padding * 2.0) - Vec2{0.0, popup.bar_height + ui.style.padding * 2.0}
 	
 	// Draw BG
 	ui.draw_rect(
@@ -85,8 +87,6 @@ pub fn (mut popup NewSessionPopup) draw(mut ui UI) {
 	)
 	
 	// Draw Map
-	popup.world_size
-	
 	for raw_tri in popup.earth_shape {
 		tri := raw_tri.scale(popup.world_size).offset(popup.world_from)
 		ui.ctx.draw_triangle_filled(
@@ -112,7 +112,7 @@ pub fn (mut popup NewSessionPopup) draw(mut ui UI) {
 		for i, server in popup.servers {
 			p := Vec2{(server.lon + 180.0) / 360.0, (-server.lat + 90.0) / 180.0} * popup.world_size + popup.world_from
 			dot_size := 8.0
-			dot_color := if server.ping < 40.0 { ui.style.color_correct } else { if server.ping < 80.0 { ui.style.color_warning } else { ui.style.color_error } }
+			dot_color := if server.ping < 20.0 { ui.style.color_correct } else { if server.ping < 30.0 { ui.style.color_warning } else { ui.style.color_error } }
 			// Draw Server if live
 			if server.status == .live {
 				// > Loading
@@ -201,10 +201,10 @@ pub fn (mut popup NewSessionPopup) draw(mut ui UI) {
 		ping_color := if server.ping < 0.0 {
 			ui.style.color_grey.brighten(0.2)
 		} else {
-			if server.ping < 40.0 {
+			if server.ping < 20.0 {
 				ui.style.color_correct
 			} else {
-				if server.ping < 60.0 {
+				if server.ping < 30.0 {
 					ui.style.color_warning
 				} else {
 					ui.style.color_error
@@ -224,10 +224,19 @@ pub fn (mut popup NewSessionPopup) draw(mut ui UI) {
 	// TODO : Draw Buttons at each 15%, Create Chekbox & Player Selecter With Action List
 	
 	// Draw UI Controls
-	bottom_left := popup.world_from + Vec2{0.0, popup.world_size.y + popup.bar_height}
+	bottom_left := popup.world_from + Vec2{0.0, popup.world_size.y + ui.style.padding}
 	popup.password.from = bottom_left
 	popup.password.size = Vec2{0.5 * popup.world_size.x, popup.bar_height}
 	popup.password.draw(mut ui)
+	
+	popup.start_btn.from = popup.password.from + Vec2{popup.password.size.x + ui.style.strong_padding, ui.style.padding}
+	popup.start_btn.size = Vec2{0.25 * popup.world_size.x, popup.bar_height}
+	popup.start_btn.disabled = popup.selected_server == -1
+	popup.start_btn.draw(mut ui)
+	
+	popup.cancel_btn.from = popup.password.from + Vec2{popup.start_btn.size.x + popup.password.size.x + ui.style.strong_padding * 2.0, ui.style.padding}
+	popup.cancel_btn.size = Vec2{0.25 * popup.world_size.x - ui.style.strong_padding * 2.0, popup.bar_height}
+	popup.cancel_btn.draw(mut ui)
 }
 
 pub fn (mut popup NewSessionPopup) event(mut ui UI, event &gg.Event) ! {
@@ -245,6 +254,34 @@ pub fn (mut popup NewSessionPopup) event(mut ui UI, event &gg.Event) ! {
 		}
 	} else if event.typ == .mouse_down && popup.hovering_server != -1 {
 		popup.selected_server = popup.hovering_server
+		rlock popup.servers {
+			if server := popup.servers[popup.selected_server] {
+				if server.status != .live {
+					popup.selected_server = -1
+				}
+			} else {
+				popup.selected_server = -1
+			}
+		}
+	}
+	
+	// Control Session creation Controls
+	popup.password.event(mut ui, event)
+	popup.start_btn.event2(mut ui, event)!
+	popup.cancel_btn.event2(mut ui, event)!
+	
+	if popup.cancel_btn.is_pressed {
+		popup.close(mut ui)
+	}
+	
+	if popup.start_btn.is_pressed && popup.selected_server != -1 {
+		rlock popup.servers {
+			popup.project.start_session(popup.servers[popup.selected_server]) or {
+				ui.call_hook("toast-error", "Failed to start session : ${err}".str) or {  }
+				log.error("Failed to start session : ${err}")
+			}
+		}
+		popup.close(mut ui)
 	}
 }
 
@@ -259,6 +296,13 @@ pub fn (mut popup NewSessionPopup) close(mut ui UI) {
 pub fn (mut popup NewSessionPopup) fetch_servers() {
 	// TODO : Internet logic here
 	temp := '{
+    "dbg": {
+        "title": "Test",
+        "status": "live",
+        "ip": "127.0.0.1",
+        "lon": 142.0,
+        "lat": -81.3
+    },
     "de": {
         "title": "Germany",
         "status": "live",
