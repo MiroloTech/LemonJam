@@ -273,6 +273,11 @@ pub fn (mut win Window) frame(mut ui UI) {
 	win.toaster.draw(mut ui)
 	
 	// ui.draw_icon("not-found", Vec2{0, 0}, Vec2{100, 100}, Color.hex("#f1f6f0"))
+	
+	// Update Session if active
+	if win.project.session != unsafe { nil } {
+		win.project.session.update()
+	}
 }
 
 pub fn (mut win Window) event(mut ui UI, event &gg.Event) {

@@ -40,9 +40,9 @@ pub struct Button {
 pub fn (btn Button) draw(mut ui UI) {
 	if btn.is_hovered {
 		if btn.disabled {
-			ui.cursor = .not_allowed
+			ui.set_cursor(.not_allowed)
 		} else {
-			ui.cursor = .pointing_hand
+			ui.set_cursor(.pointing_hand)
 		}
 	}
 	

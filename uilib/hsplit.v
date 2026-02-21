@@ -41,7 +41,7 @@ pub fn (hsplit HSplit) draw(mut ui UI) {
 	
 	// Set mouse mode
 	if hsplit.hovering != -1 || hsplit.dragging > -1 {
-		ui.cursor = .resize_ew
+		ui.set_cursor(.resize_ew)
 	}
 }
 

@@ -1,5 +1,7 @@
 module tools
 
+/*
+
 import gg
 import sokol.sapp
 
@@ -31,4 +33,5 @@ pub fn (mut tool ToolPlaceNotes) on_ui_event(mut ui UI, event &gg.Event) {
 pub fn (mut tool ToolPlaceNotes) draw(mut ui UI) {
 	
 }
+*/
 

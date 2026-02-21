@@ -118,7 +118,7 @@ pub fn (mut header Header) draw(mut ui UI) {
 				f32(width), f32(header.height),
 				ui.style.color_panel.get_gx()
 			)
-			ui.cursor = .pointing_hand
+			ui.set_cursor(.pointing_hand)
 		}
 		// > Draw option title
 		ui.ctx.draw_text(

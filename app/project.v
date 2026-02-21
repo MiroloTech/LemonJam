@@ -1,7 +1,7 @@
 module app
 
 import audio.objs { Instrument, Pattern, Effect, Note, Track, TrackType }
-import mirrorlib { NID, NIDType, Server }
+import mirrorlib { NID, NIDType, Server, Conn }
 import uilib { UI }
 
 import std { Color }
@@ -15,7 +15,7 @@ import x.json2 as json
 pub struct Project {
 	pub mut:
 	name                        string
-	session                     ?Session
+	session                     &Session                = unsafe { nil }
 	user_name                   string                  = "Jason"
 	
 	sample_rate                 u32
@@ -64,7 +64,7 @@ pub fn (mut project Project) load_from_file(path string) ! {
 	
 	// LOAD INSTRUMENTS
 	instruments := data["instruments"] or { []json.Any{} }
-	for instrument_id, raw_instrument_data in instruments.arr() {
+	for instrument_id, raw_instrument_data in instruments.as_array() {
 		instrument_data := raw_instrument_data.as_map()
 		instrument_file := instrument_data["file"] or { return error("Failed to find file in instrument ${instrument_id}") }
 		raw_instrument_user_data := instrument_data["data"] or { "" }
@@ -75,7 +75,7 @@ pub fn (mut project Project) load_from_file(path string) ! {
 	
 	// LOAD PATTERNS
 	patterns := data["patterns"] or { []json.Any{} }
-	for raw_pattern_data in patterns.arr() {
+	for raw_pattern_data in patterns.as_array() {
 		pattern_data := raw_pattern_data.as_map()
 		name_data := (pattern_data["name"] or { "unnamed" }).str()
 		color_data := Color.hex((pattern_data["color"] or { "#fff0000" }).str())
@@ -83,7 +83,7 @@ pub fn (mut project Project) load_from_file(path string) ! {
 		
 		// > Parse notes
 		raw_notes := pattern_data["notes"] or { return error("Failed to find property 'notes' in save file") }
-		notes := raw_notes.arr()
+		notes := raw_notes.as_array()
 		for note_data in notes {
 			nid := project.new_nid(.note)
 			note := Note.from_data_tag(note_data.str(), nid)
@@ -94,7 +94,7 @@ pub fn (mut project Project) load_from_file(path string) ! {
 		raw_note_colors := pattern_data["colors"] or { return error("Failed to find property 'notes' in save file") }
 		note_colors := raw_note_colors.as_map()
 		for color, raw_note_ids in note_colors {
-			for note_id in raw_note_ids.arr() {
+			for note_id in raw_note_ids.as_array() {
 				note := pattern.notes[note_id.int()] or { continue }
 				pattern.colors[note] = Color.hex(color.str())
 			}
@@ -107,7 +107,7 @@ pub fn (mut project Project) load_from_file(path string) ! {
 		for str_instrument_id, raw_instrument_note_arr in raw_instrument_data.as_map() {
 			// 0: [0, 1, 2]
 			instrument_id := str_instrument_id.int()
-			instrument_raw_notes := raw_instrument_note_arr.arr()
+			instrument_raw_notes := raw_instrument_note_arr.as_array()
 			instrument := project.instruments[instrument_id] or { continue }
 			
 			for instrument_raw_note in instrument_raw_notes {
@@ -126,7 +126,7 @@ pub fn (mut project Project) load_from_file(path string) ! {
 	}
 	
 	// LOAD TRACKS
-	tracks := data["tracks"] or { []json.Any{} }.arr()
+	tracks := data["tracks"] or { []json.Any{} }.as_array()
 	for raw_track_data in tracks {
 		track_data := raw_track_data.as_map()
 		track_title := track_data["title"] or { "unnamed" }.str()
@@ -136,7 +136,7 @@ pub fn (mut project Project) load_from_file(path string) ! {
 		mut track := project.new_track(track_title, track_typ) or { return error("Failed to create new track object in project : ${err}") }
 		match track_typ {
 			.pattern {
-				raw_elements := (track_data["elements"] or { break }).arr()
+				raw_elements := (track_data["elements"] or { break }).as_array()
 				for raw_element in raw_elements {
 					element_data := raw_element.as_map()
 					from := element_data["from"]     or { continue }.f64()
@@ -228,7 +228,11 @@ pub fn (mut project Project) update_ui_from_save_file(mut ui UI) {
 // ========== SESSION CONTROLS ==========
 
 pub fn (mut project Project) start_session(server Server) ! {
-	log.info("Starting new session at server ${server.title}...")
+	log.info("Starting new session at server '${server.title}' ...")
+	project.session = Session.new(server) or { return error("Failed to start session : ${err}") }
+	if project.session != unsafe { nil } {
+		project.session.start_new_session() or { return error("Failed to properly start new session : ${err}") }
+	}
 }
 
 

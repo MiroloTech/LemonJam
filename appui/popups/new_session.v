@@ -167,7 +167,7 @@ pub fn (mut popup NewSessionPopup) draw(mut ui UI) {
 	// Show Server data
 	if popup.hovering_server != -1 {
 		// > Control mouse
-		ui.cursor = .pointing_hand
+		ui.set_cursor(.pointing_hand)
 		
 		// > Draw data preview
 		server := popup.servers[popup.hovering_server] or { return }
@@ -276,7 +276,8 @@ pub fn (mut popup NewSessionPopup) event(mut ui UI, event &gg.Event) ! {
 	
 	if popup.start_btn.is_pressed && popup.selected_server != -1 {
 		rlock popup.servers {
-			popup.project.start_session(popup.servers[popup.selected_server]) or {
+			server := popup.servers[popup.selected_server]
+			popup.project.start_session(server) or {
 				ui.call_hook("toast-error", "Failed to start session : ${err}".str) or {  }
 				log.error("Failed to start session : ${err}")
 			}

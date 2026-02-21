@@ -82,7 +82,7 @@ pub fn (edit LineEdit) draw(mut ui UI) {
 	
 	// Update mouse cursor
 	if edit.is_hovered {
-		ui.cursor = .ibeam
+		ui.set_cursor(.ibeam)
 	}
 }
 

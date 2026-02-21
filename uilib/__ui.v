@@ -23,6 +23,7 @@ pub struct UI {
 	scissor_stack       []Rect2               = []Rect2{}
 	delta               f64                   = 1.0
 	cursor              sapp.MouseCursor      = .default
+	cursor_locked       bool
 	icons               map[string]&gg.Image
 	not_found_icon      &gg.Image             = unsafe { nil }
 	mpos                Vec2                  = Vec2.zero()
@@ -38,6 +39,12 @@ pub struct UI {
 	on_event            []fn (mut ui UI, event Event) !  // NOTICE : Events surpressed at on_mouse_move, on_action_press, etc. DON'T block on_event; on_eevnt is called after all other event hooks
 	
 	popups              []Popup
+}
+
+pub fn (mut ui UI) set_cursor(cursor sapp.MouseCursor) {
+	if !ui.cursor_locked {
+		ui.cursor = cursor
+	}
 }
 
 pub fn (ui UI) get_window_size() Vec2 {
@@ -85,7 +92,8 @@ pub fn (mut ui UI) draw() {
 	ui.timer.restart()
 	
 	sapp.set_mouse_cursor(ui.cursor)
-	ui.cursor = .default
+	ui.set_cursor(.default)
+	ui.cursor_locked = false
 	
 	// Draw popups seperately
 	if ui.popups.len > 0 {

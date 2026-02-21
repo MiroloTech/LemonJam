@@ -41,7 +41,7 @@ pub fn (vsplit VSplit) draw(mut ui UI) {
 	
 	// Set mouse mode
 	if vsplit.hovering != -1 || vsplit.dragging > -1 {
-		ui.cursor = .resize_ns
+		ui.set_cursor(.resize_ns)
 	}
 }
 

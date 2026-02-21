@@ -141,7 +141,7 @@ pub fn (mut rack Rack) draw(mut ui UI) {
 	
 	// Update mouse cursor
 	if rack.tab_hovered != -1 {
-		ui.cursor = .pointing_hand
+		ui.set_cursor(.pointing_hand)
 	}
 	
 	// Draw elements in tab

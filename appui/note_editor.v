@@ -4,7 +4,7 @@ import gg
 import math { floor, ceil, mod }
 import log
 
-import appui.tools { NoteEditorTool, ToolSelectNotes, ToolMoveNotes, ToolCutNotes, ToolPlaceNotes }
+import appui.tools { EditorToolSkeleton, ToolMoveNotes, ToolCutNotes, ToolSelectNotes }
 import audio.objs { Note, Pattern }
 import std { Color }
 import std.geom2 { Vec2, Rect2 }
@@ -32,16 +32,7 @@ pub struct NoteEditor {
 	selected_color               int
 	hovering_color               int              = -1
 	
-	/*
-	notes                        []&Note          = []
-	selected_notes               []&Note
-	hovering_note                &Note            = unsafe { nil }
-	left_handles                 []&Note
-	right_handles                []&Note
-	*/
 	notes                        []&NoteUI       = []
-	
-	// TODO : Add lambdas to tools to allow for ntoe-space to world-space and world-space to note-space conversions
 	
 	playhead_pos                 f64
 	hovering_playhead            bool
@@ -50,19 +41,19 @@ pub struct NoteEditor {
 	piano                        Piano            = Piano{}
 	piano_width                  f64              = 180.0
 	
-	tools                        []NoteEditorTool = [
+	tools                        []EditorToolSkeleton[NoteUI] = [
 		ToolSelectNotes{},
 		ToolMoveNotes{},
-		ToolPlaceNotes{},
-		ToolCutNotes{},
+		ToolCutNotes{}
+		// ToolPlaceNotes{},
 	]
-	selected_tool                int              = 1
+	selected_tool                int //              = 1
 	
 	pub:
 	note_inside_drag_dist        f64              = 4.0
 	note_outside_drag_dist       f64              = 12.0
 	scrub_snapping               f64              = 0.5
-	note_snapping                f64              = 0.5
+	note_snapping                f64              = 0.5 // bars
 	
 	mut:
 	panning                      bool
@@ -89,11 +80,11 @@ pub fn (mut editor NoteEditor) draw(mut ui UI) {
 	
 	// Update mouse
 	if editor.panning {
-		ui.cursor = .resize_all
+		ui.set_cursor(.resize_all)
 	} else if editor.hovering_color != -1 {
-		ui.cursor = .pointing_hand
+		ui.set_cursor(.pointing_hand)
 	} else if editor.hovering_playhead {
-		ui.cursor = .pointing_hand
+		ui.set_cursor(.pointing_hand)
 	}
 	
 	ui.pop_scissor()
@@ -162,7 +153,7 @@ pub fn (mut editor NoteEditor) event(mut ui UI, event &gg.Event) ! {
 	// Control tools
 	editor_rect := Rect2{editor.from + Vec2{0.0, editor.header_height}, editor.from + editor.size}
 	if editor_rect.is_point_inside(ui.mpos) || event.typ == .mouse_up {
-		editor.tools[editor.selected_tool].on_ui_event(mut ui, event)
+		editor.tools[editor.selected_tool].event(mut ui, event)
 	}
 }
 
@@ -216,7 +207,8 @@ pub fn (mut editor NoteEditor) draw_notes(mut ui UI) {
 		note_ui.size = Vec2{sizex, rail.size().y}
 		
 		// > Draw Note
-		is_hashed := note_ui.color != editor.colors[editor.selected_color] or { Color.hex("#ffffff") }
+		selected_color := editor.colors[editor.selected_color] or { Color.hex("#ffffff") }
+		is_hashed := note_ui.color != selected_color
 		note_ui.is_colored = !is_hashed
 		note_ui.draw(mut ui, is_hashed)
 	}
@@ -380,7 +372,7 @@ pub fn (mut editor NoteEditor) draw_tools(mut ui UI) {
 		
 		// > Update mouse cursor
 		if Rect2.from_size(tool_position, tool_size).is_point_inside(ui.mpos) {
-			ui.cursor = .pointing_hand
+			ui.set_cursor(.pointing_hand)
 		}
 		
 		// > Move next tool position
@@ -388,19 +380,16 @@ pub fn (mut editor NoteEditor) draw_tools(mut ui UI) {
 	}
 	
 	// Update note_uis list for current tool
-	editor.tools[editor.selected_tool].note_uis = editor.notes
+	editor.tools[editor.selected_tool].elements = editor.notes
 	
 	editor_rect := Rect2{editor.from + Vec2{editor.piano.size.x, editor.header_height}, editor.from + editor.size}
 	
 	// Call draw function on selected tool
 	ui.push_scissor(editor_rect)
+	ui.cursor_locked = !editor_rect.is_point_inside(ui.mpos)
 	editor.tools[editor.selected_tool].draw(mut ui)
 	ui.pop_scissor()
-	
-	if editor_rect.is_point_inside(ui.mpos) {
-		// Update cursor defined by current tool
-		ui.cursor = editor.tools[editor.selected_tool].get_cursor()
-	}
+	ui.cursor_locked = false
 }
 
 
@@ -587,13 +576,14 @@ pub fn (mut editor NoteEditor) open_pattern(pattern &Pattern) {
 
 pub fn (mut editor NoteEditor) init_tools() {
 	for mut tool in editor.tools {
-		tool.conv_world2note = fn [mut editor] (pos Vec2) (f64, int) {
+		tool.grid_world_conv.world_to_grid = fn [mut editor] (pos Vec2) (f64, int) {
 			rect := Rect2{editor.from + Vec2{editor.piano_width, editor.header_height}, editor.from + editor.size - Vec2{editor.piano_width, editor.header_height}}
-			fromx := (pos.x - editor.from.x - editor.piano_width + editor.scroll_x) / editor.pixels_per_beat
+			mut fromx := (pos.x - editor.from.x - editor.piano_width + editor.scroll_x) / editor.pixels_per_beat
+			fromx = f64_max(floor(fromx / editor.note_snapping) * editor.note_snapping, 0.0)
 			rail_id := editor.piano.get_rail_id(pos.y, rect.a + Vec2{editor.piano_width, 0.0}, rect.size())
 			return fromx, rail_id
 		}
-		tool.conv_note2world = fn [mut editor] (time f64, id int) Vec2 {
+		tool.grid_world_conv.grid_to_world = fn [mut editor] (time f64, id int) Vec2 {
 			rect := Rect2{editor.from + Vec2{editor.piano_width, editor.header_height}, editor.from + editor.size - Vec2{editor.piano_width, editor.header_height}}
 			rails := editor.piano.get_piano_rails(rect.a + Vec2{editor.piano_width, 0.0}, rect.size())
 			
