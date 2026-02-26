@@ -67,3 +67,57 @@ pub fn (mut server Server) update_ping() {
 	
 	// TODO : Send custom ping packet to server with mirrorlib
 }
+
+// WARNING : This is temporary debug list for the existing servers, where the Antartic Server is localhost
+pub fn Server.fetch_server_list() ![]Server {
+	// TODO : Maybe implement caching for this list
+	// TODO : Internet logic here
+	temp := '{
+    "ts": {
+        "title": "Test",
+        "status": "live",
+        "ip": "127.0.0.1",
+        "lon": 142.0,
+        "lat": -81.3
+    },
+    "de": {
+        "title": "Germany",
+        "status": "live",
+        "ip": "216.58.206.46",
+        "lon": 9.1,
+        "lat": 48.8
+    },
+    "au": {
+        "title": "Australia",
+        "status": "live",
+        "ip": "185.15.59.226",
+        "lon": 150.7,
+        "lat": -33.7
+    },
+    "us": {
+        "title": "United States",
+        "status": "live",
+        "ip": "140.82.121.3",
+        "lon": -121.2,
+        "lat": 37.7
+    },
+    "as": {
+        "title": "China",
+        "status": "live",
+        "ip": "151.101.65.140",
+        "lon": 121.1,
+        "lat": 31.1
+    },
+    "br": {
+        "title": "Brazil",
+        "status": "offline",
+        "ip": "142.250.185.174",
+        "lon": -38.7,
+        "lat": -12.8
+    }
+}'
+	servers := Server.load_list_from_json(temp) or {
+		return error("Failed to parse list of existing servers : ${err}")
+	}
+	return servers
+}

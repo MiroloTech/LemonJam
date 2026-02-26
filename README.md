@@ -17,7 +17,7 @@
 - [ ] Proper instrument & effect browser
 - [ ] Exporting / Rendering
 - [ ] Settings menu
-- [ ] Make own icons to avoid lawsuit from FlatIcon
+- [ ] Make custom icons
 
 ## v 0.2
 

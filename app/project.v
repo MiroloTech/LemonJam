@@ -1,7 +1,7 @@
 module app
 
 import audio.objs { Instrument, Pattern, Effect, Note, Track, TrackType }
-import mirrorlib { NID, NIDType, Server, Conn }
+import mirrorlib { NID, NIDType, Server, Conn, Session }
 import uilib { UI }
 
 import std { Color }
@@ -229,10 +229,12 @@ pub fn (mut project Project) update_ui_from_save_file(mut ui UI) {
 
 pub fn (mut project Project) start_session(server Server) ! {
 	log.info("Starting new session at server '${server.title}' ...")
-	project.session = Session.new(server) or { return error("Failed to start session : ${err}") }
-	if project.session != unsafe { nil } {
-		project.session.start_new_session() or { return error("Failed to properly start new session : ${err}") }
-	}
+	project.session = Session.new_session(server) or { return error("Failed to start Session : ${err}") }
+}
+
+pub fn (mut project Project) join_session(code string) ! {
+	log.info("Joining new session with code '${code}' ...")
+	project.session = Session.join_session(code) or { return error("Failed to join Session : ${err}") }
 }
 
 

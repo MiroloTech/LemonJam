@@ -8,7 +8,7 @@ import std.geom2 { Vec2 }
 import app { Project }
 import audio.objs { Pattern }
 import uilib { UI, Toaster, HSplit, VSplit }
-import appui.popups { NewPatternPopup, NewSessionPopup }
+import appui.popups { NewPatternPopup, NewSessionPopup, JoinSessionPopup }
 
 pub struct Window {
 	pub mut:
@@ -39,6 +39,7 @@ pub fn (mut win Window) init(mut ui UI) {
 	win.project.ui_ptr = &ui
 	
 	// Init header
+	win.header.project = mut win.project
 	win.header.options["File"] = [
 		HeaderAction{ name: "Render"         hotkey: "Ctrl+Shift+E" },
 		HeaderAction{ is_seperator: true },
@@ -68,6 +69,16 @@ pub fn (mut win Window) init(mut ui UI) {
 				mut win.project
 			)
 		} user_data: mut ui }
+		HeaderAction{ name: "Join Session"                                  on_selected: fn [mut win] (_ string, ui_ptr voidptr) {
+			mut ui := unsafe { &UI(ui_ptr) }
+			popup_size := Vec2{300.0, 125.0}
+			ui.popups << JoinSessionPopup.new(
+				ui,
+				ui.center() - popup_size * Vec2.v(0.5),
+				popup_size,
+				win.project
+			)
+		} user_data: mut ui}
 		HeaderAction{ name: "Stop Session"  disabled: true }
 	]
 	win.header.init(mut ui)

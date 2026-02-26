@@ -55,7 +55,7 @@ pub fn (edit LineEdit) draw(mut ui UI) {
 			f32(edit.from.x + sel_pos_from + ui.style.padding), f32(caret_start_y),
 			f32(sel_pos_to - sel_pos_from), f32(caret_height),
 			f32(ui.style.rounding * 0.5),
-			ui.style.color_bg.brighten(0.1).get_gx()
+			ui.style.color_bg.brighten(0.3).get_gx()
 		)
 	}
 	

@@ -4,6 +4,7 @@ import gg
 import hash
 
 import std.geom2 { Vec2 }
+import app { Project }
 import uilib { UI, ActionList, Action, Button }
 
 pub struct HeaderAction {
@@ -50,6 +51,7 @@ pub struct Header {
 	options         map[string][]HeaderAction
 	action_list     ?ActionList
 	project_name    string              = "unnamed.lmnj*"
+	project         &Project            = unsafe { nil }
 	
 	user_actions    ActionList          = ActionList{}
 	user_btn        Button              = Button{
@@ -107,8 +109,15 @@ pub fn (mut header Header) draw(mut ui UI) {
 	
 	// Draw options
 	mut option_x := 0.0
-	mut i := 0
-	for title, _ in header.options {
+	for i, title in header.options.keys() {
+		ui.ctx.set_text_cfg(
+			color: ui.style.color_text.get_gx()
+			size: ui.style.font_size
+			align: .center
+			vertical_align: .middle
+			family: ui.style.font_bold
+		)
+		
 		width := ui.ctx.text_width(title) + ui.style.strong_padding
 		
 		// > Draw hover background
@@ -137,7 +146,6 @@ pub fn (mut header Header) draw(mut ui UI) {
 		}
 		
 		option_x += width
-		i++
 	}
 	
 	// Draw User Button
@@ -147,6 +155,32 @@ pub fn (mut header Header) draw(mut ui UI) {
 	header.user_btn.size = Vec2.v(user_btn_size)
 	header.user_btn.rounding = user_btn_size / 2.0
 	header.user_btn.draw(mut ui)
+	
+	// > Draw session status circle
+	indicator_offset := 2.0
+	indicator_pos := header.user_btn.from + Vec2{header.user_btn.size.x, 0.0} + Vec2{-indicator_offset, indicator_offset}
+	indicator_size := 4.0
+	if header.project.session != unsafe { nil } {
+		indicator_color := match header.project.session.status {
+			.pending  { ui.style.color_grey }
+			.open     { ui.style.color_error }
+			.failed   { ui.style.color_warning }
+		}
+		
+		// >> Draw Circle BG
+		ui.ctx.draw_circle_filled(
+			f32(indicator_pos.x - indicator_size * 0.5), f32(indicator_pos.y + indicator_size * 0.5),
+			f32(indicator_size + 2.0),
+			ui.style.color_bg.get_gx()
+		)
+		
+		// >> Draw Indicator Circle
+		ui.ctx.draw_circle_filled(
+			f32(indicator_pos.x - indicator_size * 0.5), f32(indicator_pos.y + indicator_size * 0.5),
+			f32(indicator_size),
+			indicator_color.get_gx()
+		)
+	}
 }
 
 
@@ -159,7 +193,7 @@ pub fn (mut header Header) event(mut ui UI, event &gg.Event) ! {
 		if header.option_hovered != -1 {
 			header.option_open = header.option_hovered
 			option_tag := header.options.keys()[header.option_hovered] or { return }
-			x, _ := header.get_option_dimensions(ui, header.option_open)
+			x, _ := header.get_option_dimensions(mut ui, header.option_open)
 			header.action_list = (header.options[option_tag] or { return }).to_ui_action_list(
 				Vec2{x, header.height},
 				Vec2{160.0, 0.0}
@@ -196,7 +230,7 @@ pub fn (mut header Header) on_mouse_move(mut ui UI, mpos Vec2, _ Vec2) ! {
 	header.option_hovered = -1
 	
 	for i in 0..header.options.len {
-		x, width := header.get_option_dimensions(ui, i)
+		x, width := header.get_option_dimensions(mut ui, i)
 		
 		if mpos.y >= 0.0 && mpos.y < header.height && mpos.x >= x  && mpos.x < x + width {
 			header.option_hovered = i
@@ -208,11 +242,19 @@ pub fn (mut header Header) on_mouse_move(mut ui UI, mpos Vec2, _ Vec2) ! {
 
 // ===== UTILITY =====
 
-pub fn (header Header) get_option_dimensions(ui UI, id int) (f64, f64) {
+pub fn (header Header) get_option_dimensions(mut ui UI, id int) (f64, f64) {
+	ui.ctx.set_text_cfg(
+		color: ui.style.color_text.get_gx()
+		size: ui.style.font_size
+		align: .center
+		vertical_align: .middle
+		family: ui.style.font_bold
+	)
+	
 	mut x := 0.0
 	for i in 0..id {
 		title := header.options.keys()[i] or { break }
-		width := ui.ctx.text_width(title) // + ui.style.strong_padding
+		width := ui.ctx.text_width(title) + ui.style.strong_padding
 		x += width
 	}
 	

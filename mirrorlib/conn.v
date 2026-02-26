@@ -13,12 +13,13 @@ pub const tcp_read_buffer_size     := int(max_u16)
 pub const max_packets_per_update   := 16
 pub const conn_registry_timeout    := 5.0
 
+pub type PacketHook = fn (packet Packet)
+
 @[heap]
 pub struct Conn {
 	pub mut:
 	is_connected             bool
-	session_code             string
-	server_ip                string
+	// server_ip                string
 	
 	tcp                      &net.TcpConn
 	
@@ -27,24 +28,30 @@ pub struct Conn {
 	on_session_created       ?fn (session_code string)
 	on_session_connect       ?fn ()
 	on_session_disconnect    ?fn ()
+	on_server_error          ?fn (msg string)
+	
+	packet_hooks             map[u32][]PacketHook
 	
 	// Used internally to avoid connection and disconnection of the on_packet hook (Note, that this skips all but the last packet, when backlog includes more than one packet)
 	last_packet              Packet             = Packet.empty(0)
 	
 	mut:
 	backlog                  shared []u8
+	
+	pub:
+	is_host                  bool
 }
 
 // Returns a new connection instance (not active)
-pub fn Conn.new(target_ip string) !&Conn {
+pub fn Conn.new(target_ip string, is_host bool) !&Conn {
 	server_ip := (if target_ip.contains(":") { target_ip.all_before(":") } else { target_ip }) + ":${server_port}"
 	
 	// Connect to server
 	mut tcp := net.dial_tcp(server_ip) or { return error("Failed to connect to server under ip ${server_ip} : ${err}") }
 	mut conn := &Conn{
-		server_ip: server_ip
 		is_connected: false
 		tcp: tcp
+		is_host: is_host
 	}
 	go conn.update_routine()
 	
@@ -115,14 +122,7 @@ pub fn (mut conn Conn) package() {
 			
 			// > Construct Packet and call on_packet hook
 			packet := Packet{action: packet_action, data: data}
-			println("New packet : ${packet}")
-			if conn.on_packet != none {
-				conn.on_packet(packet)
-			}
-			if packet.action in internal_actions {
-				conn.on_packet_internal(packet)
-			}
-			conn.last_packet = packet
+			conn.react_to_packet(packet)
 			
 			// > Return error on insufficient loop size to handle backlog
 			if i == max_packets_per_update - 1 {
@@ -156,34 +156,58 @@ pub fn (mut conn Conn) update_routine() ! {
 }
 
 
+// Internal reaction-function to new packets
+fn (mut conn Conn) react_to_packet(packet Packet) {
+	println("New packet : ${packet}")
+	
+	// > Call base hook for all packets
+	if conn.on_packet != none {
+		conn.on_packet(packet)
+	}
+	
+	// > Call packet-action-specific hook
+	if packet.action in conn.packet_hooks.keys() {
+		for hook in conn.packet_hooks[packet.action] {
+			hook(packet)
+		}
+	}
+	
+	// > Trigger an internal packet reaction
+	if packet.action in internal_actions {
+		conn.on_packet_internal(packet)
+	}
+	
+	// > Re-/Define last packet on connection
+	conn.last_packet = packet
+}
+
 
 // Used to handle internal non-app-specific packets to keep the connection up (heartbeat, reconnection, etc.)
 fn (mut conn Conn) on_packet_internal(packet Packet) {
 	match packet.action {
 		// Call hook for session join and activate active session mode
 		action_session_code_confirmation {
-			conn.session_code = packet.data.bytestr()
+			session_code := packet.data.bytestr()
 			if conn.on_session_created != none {
-				conn.on_session_created(conn.session_code)
+				conn.on_session_created(session_code)
 			}
 			conn.is_connected = true
-			log.info("User connected successfully to Session '${conn.session_code}'.")
+			log.info("User connected successfully to Session '${session_code}'.")
+		}
+		action_session_join_confirmation {
+			log.info("USer joining session confirmed")
+			if conn.on_session_connect != none {
+				conn.on_session_connect()
+			}
+			conn.is_connected = true
+		}
+		action_server_error {
+			if conn.on_server_error != none {
+				conn.on_server_error(packet.data.bytestr())
+			}
 		}
 		else {  }
 	}
-}
-
-
-// ========== CONNECTION ==========
-
-// Creates a new connection on the given server
-pub fn (mut conn Conn) start_new_session(target_ip string) ! {
-	// Send new session request
-	packet := Packet.empty(action_create_session)
-	conn.send_packet(packet) or { return error("Failed to write packet '${packet.action}' to tcp connection : ${err}") }
-	
-	// Log
-	log.info("User sent new session creation request to '${target_ip}'.")
 }
 
 

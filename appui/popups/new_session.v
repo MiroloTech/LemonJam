@@ -295,61 +295,15 @@ pub fn (mut popup NewSessionPopup) close(mut ui UI) {
 
 
 pub fn (mut popup NewSessionPopup) fetch_servers() {
-	// TODO : Internet logic here
-	temp := '{
-    "dbg": {
-        "title": "Test",
-        "status": "live",
-        "ip": "127.0.0.1",
-        "lon": 142.0,
-        "lat": -81.3
-    },
-    "de": {
-        "title": "Germany",
-        "status": "live",
-        "ip": "216.58.206.46",
-        "lon": 9.1,
-        "lat": 48.8
-    },
-    "au": {
-        "title": "Australia",
-        "status": "live",
-        "ip": "185.15.59.226",
-        "lon": 150.7,
-        "lat": -33.7
-    },
-    "us": {
-        "title": "United States",
-        "status": "live",
-        "ip": "140.82.121.3",
-        "lon": -121.2,
-        "lat": 37.7
-    },
-    "as": {
-        "title": "China",
-        "status": "live",
-        "ip": "151.101.65.140",
-        "lon": 121.1,
-        "lat": 31.1
-    },
-    "br": {
-        "title": "Brazil",
-        "status": "offline",
-        "ip": "142.250.185.174",
-        "lon": -38.7,
-        "lat": -12.8
-    }
-}'
+	server_list := Server.fetch_server_list() or {
+		log.error("Failed to fetch list of servers : ${err}")
+		return
+	}
 	lock popup.servers {
-		popup.servers = Server.load_list_from_json(temp) or {
-			log.error("Failed to fetch list of servers : ${err}")
-			return
-		}
-		
+		popup.servers = server_list
 		for mut server in popup.servers {
 			go server.update_ping()
 		}
-		// println(popup.servers)
 	}
 }
 

@@ -147,7 +147,7 @@ pub fn (timeline Timeline) draw_track(mut ui UI, from Vec2, mut track TrackUI) {
 			element.obj.color
 		} else {
 			Color.hex("#0000ff")
-		} // track.track.colors[element] or { ui.style.color_error }
+		}
 		
 		ui.draw_rect(
 			element_from,
