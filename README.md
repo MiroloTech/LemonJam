@@ -35,4 +35,7 @@
 
 ## v 1.0.0
 
+# How to execute LemonJam
+
+Run ```v crun .``` in the project directory to quickly and directly run the program. If it panics due to something related to *AppData*, run ```v build.vsh```, which auto-creates an AppData folde with resources from the res\ folder, which LemonJam needs to run (external icons, fonts, etc.). If this .vsh file failes, please create a bug report in GitHub to let the issue be resolved.
 

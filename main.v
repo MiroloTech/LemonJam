@@ -2,6 +2,7 @@ module main
 
 import gg
 
+import std.project
 import uilib { UI }
 import appui { Window }
 
@@ -13,6 +14,7 @@ pub struct App {
 }
 
 fn main() {
+	project.extract_appdata()
 	mut app := App{}
 	app.ui.ctx = gg.new_context(
 		width:            1920

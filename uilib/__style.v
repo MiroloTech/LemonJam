@@ -1,6 +1,7 @@
 module uilib
 
 import std { Color }
+import std.project { get_appdata_path }
 
 pub struct Style {
 	pub mut:
@@ -57,10 +58,10 @@ pub struct Style {
 	scroll_step_h              f64                 = 40.0
 	
 	// Fonts
-	font_regular               string              = "${@VMODROOT}/uilib/fonts/PlayPenSans-Regular.ttf"
-	font_bold                  string              = "${@VMODROOT}/uilib/fonts/PlayPenSans-Bold.ttf"
-	font_italic                string              = "${@VMODROOT}/uilib/fonts/PlayPenSans-Regular.ttf" // TODO : Replace with proper italic font
-	font_bold_italic           string              = "${@VMODROOT}/uilib/fonts/PlayPenSans-Bold.ttf" // TODO : Replace with proper italic-bold font
-	font_mono                  string              = "${@VMODROOT}/uilib/fonts/SourceCodePro-Regular.ttf"
+	font_regular               string              = "${get_appdata_path()}/fonts/PlayPenSans-Regular.ttf"
+	font_bold                  string              = "${get_appdata_path()}/fonts/PlayPenSans-Bold.ttf"
+	font_italic                string              = "${get_appdata_path()}/fonts/PlayPenSans-Regular.ttf" // TODO : Replace with proper italic font
+	font_bold_italic           string              = "${get_appdata_path()}/fonts/PlayPenSans-Bold.ttf" // TODO : Replace with proper italic-bold font
+	font_mono                  string              = "${get_appdata_path()}/fonts/SourceCodePro-Regular.ttf"
 }
 

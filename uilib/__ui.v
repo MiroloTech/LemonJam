@@ -6,8 +6,9 @@ import gg
 import time
 import sokol.sapp
 
+import std.project { get_appdata_path }
 import std.geom2 { Rect2, Vec2 }
-const not_found_icon_src := $embed_file("./icons/not-found.png").to_bytes()
+const not_found_icon_src := $embed_file("././res/icons/not-found.png").to_bytes()
 
 pub type Hook = fn (user_data voidptr)
 pub type EventHook = fn (mut ui UI) !
@@ -82,7 +83,7 @@ pub fn (mut ui UI) pop_scissor() {
 }
 
 pub fn (mut ui UI) init() {
-	ui.load_icon_list("${@VMODROOT}/uilib/icons/") or { log.error("Failed to load icon(s) : ${err}") }
+	ui.load_icon_list("${get_appdata_path()}/icons/") or { log.error("Failed to load icon(s) : ${err}") }
 	println("${ui.icons.len + 1} icons loaded")
 }
 

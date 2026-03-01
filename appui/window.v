@@ -5,6 +5,7 @@ import log
 
 // import std { Color }
 import std.geom2 { Vec2 }
+import std.project { get_appdata_path }
 import app { Project }
 import audio.objs { Pattern }
 import uilib { UI, Toaster, HSplit, VSplit }
@@ -190,7 +191,7 @@ pub fn (mut win Window) init(mut ui UI) {
 	win.note_editor.notes = [ &note1, &note2, &note3, &note4, &note5, &note6, &note7, &note8, &note9, &note10, &note11, &note12, &note13, &note14 ]
 	*/
 	
-	win.project.load_from_file("${@VMODROOT}/temp.json") or { log.error("Failed to load project form file : ${err}") } // TEMP & TODO
+	win.project.load_from_file("${get_appdata_path()}/projects/temp.json") or { log.error("Failed to load project form file : ${err}") } // TEMP & TODO
 	win.project.update_ui_from_save_file(mut ui)
 	// win.toaster.add_toast("Save file loaded", .info, 2.0) // TODO : Move the loading to seperate function and buffer toasts until first redraw
 	

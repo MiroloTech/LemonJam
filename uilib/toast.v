@@ -34,7 +34,7 @@ pub struct ToastStyle {
 	color_warning   Color                   = Color.hex("#ffe176")
 	color_error     Color                   = Color.hex("#ed1c24")
 	
-	font_path       string                  = "${@VMODROOT}/uilib/fonts/SourceCodePro-Regular.ttf"
+	font_path       string
 }
 
 pub struct Toast {
