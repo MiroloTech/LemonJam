@@ -23,7 +23,7 @@ vm := vmod.decode(@VMOD_FILE)!
 version_tag := "v" + vm.version.replace(".", "-")
 
 // > Delete old .zip file
-target_zip_file := "target/LemonJam_v${version_tag}.zip"
+target_zip_file := "target/LemonJam_${version_tag}.zip"
 rm(target_zip_file) or {  }
 
 // > Zip that folder

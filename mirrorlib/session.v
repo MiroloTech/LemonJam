@@ -2,10 +2,12 @@ module mirrorlib
 
 import log
 import time
+import encoding.binary { big_endian_u64 }
 // import net.http
 // import x.json2 as json
 
 pub const session_ready_timeout := 30.0 // Time the client can take to receive a status update on the creation / joining of a session
+pub const nid_request_timeout := 20.0
 
 pub enum SessionStatus {
 	pending
@@ -16,19 +18,26 @@ pub enum SessionStatus {
 @[heap]
 pub struct Session {
 	pub:
-	server           Server
+	server                    Server
 	
 	pub mut:
-	session_code     string
-	status           SessionStatus       = .pending
-	conn             &Conn              = unsafe { nil }
+	session_code              string
+	status                    SessionStatus        = .pending
+	conn                      &Conn                = unsafe { nil }
 	
-	on_ready         ?fn ()
+	on_ready                  ?fn ()
+	can_update                bool                 = true
+	
+	on_packet_create          ?fn (nid u64, data []u8)
+	on_packet_update          ?fn (nid u64, data []u8)
+	on_packet_delete          ?fn (nid u64, data []u8)
+	on_packet_lock            ?fn (nid u64, data []u8)
+	on_packet_unlock          ?fn (nid u64, data []u8)
 }
 
 pub fn (mut session Session) update() {
 	// Update Session connection status
-	if !session.conn.is_connected {
+	if !session.conn.is_connected || !session.can_update {
 		return
 	}
 	
@@ -60,6 +69,10 @@ pub fn Session.new_session(server Server) !&Session {
 	
 	// Log
 	log.info("User sent new session creation request to '${server.ip}'.")
+	
+	// TODO : Await createion here
+	
+	session.init_hooks()
 	
 	return session
 }
@@ -108,7 +121,50 @@ pub fn Session.join_session(session_code string) !&Session {
 		return error("Failed to join session.")
 	}
 	
+	session.init_hooks()
+	
 	return session
+}
+
+
+pub fn (mut session Session) on_packet(packet Packet) {
+	if packet.data.len < 8 { return }
+	mut bytes := PacketBytes(packet.data.clone())
+	nid := bytes.pop_u64()
+	match packet.action {
+		action_element_create {
+			if session.on_packet_create != none {
+				session.on_packet_create(nid, bytes)
+			}
+		}
+		action_element_update {
+			if session.on_packet_update != none {
+				session.on_packet_update(nid, bytes)
+			}
+		}
+		action_element_delete {
+			if session.on_packet_delete != none {
+				session.on_packet_delete(nid, bytes)
+			}
+		}
+		action_element_lock {
+			if session.on_packet_lock != none {
+				session.on_packet_lock(nid, bytes)
+			}
+		}
+		action_element_unlock {
+			if session.on_packet_unlock != none {
+				session.on_packet_unlock(nid, bytes)
+			}
+		}
+		else {  }
+	}
+}
+
+pub fn (mut session Session) send_packet(packet Packet) {
+	session.conn.send_packet(packet) or {
+		log.error("Failed to send packet '${packet.action}' from Session : ${err}")
+	}
 }
 
 
@@ -134,6 +190,39 @@ pub fn (mut session Session) wait_until_ready() ! {
 			break
 		}
 	}
+}
+
+pub fn (mut session Session) init_hooks() {
+	if session.conn == unsafe { nil } {
+		log.error("Can't initiaize connection hooks at the moment : Connection no initialized")
+		return
+	}
+	
+	session.conn.on_packet = session.on_packet
+}
+
+// Asks the Server for a new Network ID, waits for a response and returns that (times out after ```nid_request_timeout``` seconds)
+pub fn (mut session Session) get_new_nid() !u64 {
+	// > Send new-nid request
+	session.can_update = false
+	defer {
+		session.can_update = true
+	}
+	
+	session.conn.send_packet(Packet.empty(action_new_nid)) or {
+		return error("Failed to send new-nid request packet : ${err}")
+	}
+	
+	// > Wait for repsonse
+	nid_packet := session.conn.wait_for_packet(action_new_nid, nid_request_timeout) or {
+		return error("Waiting for new NID from server timed out : ${err}")
+	}
+	
+	nid := big_endian_u64(nid_packet.data)
+	println("New NID received : ${nid}")
+	
+	// > Return new NID
+	return nid
 }
 
 

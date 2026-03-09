@@ -210,6 +210,30 @@ fn (mut conn Conn) on_packet_internal(packet Packet) {
 	}
 }
 
+// Freezes frame until a packet with the given action is received, which is then returned, or the request times out after ```timeout``` seconds
+pub fn (mut conn Conn) wait_for_packet(action u32, timeout f64) !Packet {
+	// > Create stop watch for timeout
+	sw := time.new_stopwatch()
+	conn.last_packet = Packet.empty(0)
+	
+	// > Wait and re-package incoming data until packet with action is received or loop times out
+	for {
+		// > Return error on timeout
+		if sw.elapsed().seconds() > timeout {
+			return error("Awaital for packet with action '${action}' timed out after ${timeout} sec.")
+		}
+		
+		conn.package()
+		
+		// TODO : Implement stack feature to not be limited by the 'last packet' per packaging command (multiple packets might be made during one ```package``` call)
+		if conn.last_packet.action == action {
+			return conn.last_packet
+		}
+	}
+	return error("Awaital for packet with action '${action}' timed out after ${timeout} sec.")
+}
+
+
 
 // ========== UTILLITY ==========
 

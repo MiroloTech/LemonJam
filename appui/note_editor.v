@@ -4,7 +4,7 @@ import gg
 import math { floor, ceil, mod }
 import log
 
-import appui.tools { EditorToolSkeleton, ToolMoveNotes, ToolCutNotes, ToolSelectNotes }
+import appui.tools { EditorToolSkeleton, ToolMoveNotes, ToolCutNotes, ToolSelectNotes, ToolPlaceNotes }
 import audio.objs { Note, Pattern }
 import std { Color }
 import std.geom2 { Vec2, Rect2 }
@@ -45,7 +45,7 @@ pub struct NoteEditor {
 		ToolSelectNotes{},
 		ToolMoveNotes{},
 		ToolCutNotes{}
-		// ToolPlaceNotes{},
+		ToolPlaceNotes{},
 	]
 	selected_tool                int //              = 1
 	

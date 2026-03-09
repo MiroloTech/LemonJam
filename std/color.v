@@ -214,6 +214,16 @@ pub fn Color.rgba(r f64, g f64, b f64, a f64) Color {
 	return Color { r, g, b, a }
 }
 
+// rgba8 returns a color from the given r, g, b, a components in 8-bit resolution
+pub fn Color.rgba8(r u8, g u8, b u8, a u8) Color {
+	return Color{
+		r: f64(r) / 255.0
+		g: f64(g) / 255.0
+		b: f64(b) / 255.0
+		a: f64(a) / 255.0
+	}
+}
+
 // hex returns a color from the given hex string
 pub fn Color.hex(hex string) Color {
 	// Remove Every unnescecarry charecter from hex

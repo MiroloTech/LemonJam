@@ -6,6 +6,7 @@ import std { Color }
 import app { Project }
 import std.geom2 { Vec2, Rect2 }
 import uilib { UI, Event, Button, LineEdit }
+import mirrorlib { NIDType, Packet, PacketBytes }
 
 @[heap]
 pub struct NewPatternPopup {
@@ -108,6 +109,7 @@ pub fn (mut popup NewPatternPopup) event(mut ui UI, event &gg.Event) ! {
 
 pub fn (mut popup NewPatternPopup) create_pattern(mut ui UI) ! {
 	pattern_name := popup.line_edit_name.text
+	pattern_color := Color.hex("00ff00")
 	if pattern_name == "" {
 		ui.call_hook("toast-error", "Invalid pattern name".str) or {  }
 		return uilib.surpress_event()
@@ -116,10 +118,20 @@ pub fn (mut popup NewPatternPopup) create_pattern(mut ui UI) ! {
 		ui.call_hook("toast-error", "No Project loaded".str) or {  }
 		return uilib.surpress_event()
 	}
-	pattern := popup.project.new_pattern(pattern_name, Color.hex("00ff00"))
+	pattern := popup.project.new_pattern(pattern_name, pattern_color)
 	// TODO : Add color selector popup inside popup
 	ui.call_hook("add-to-pattern-list", pattern) or {  }
 	ui.call_hook("toast-info", "New Pattern created : ${pattern_name}".str) or {  }
+	
+	// Create pattern within session
+	if popup.project.session != unsafe { nil } {
+		mut data := PacketBytes{}
+		data.push_u64(pattern.nid.id)
+		data.push_u8(u8(NIDType.pattern))
+		data.push_string(pattern_name)
+		data.push_color(pattern_color)
+		popup.project.session.send_packet(Packet{action: mirrorlib.action_element_create, data: data})
+	}
 }
 
 pub fn (mut popup NewPatternPopup) close(mut ui UI) {

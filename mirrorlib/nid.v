@@ -1,5 +1,7 @@
 module mirrorlib
 
+// import audio.objs { Instrument, Pattern, Effect, Note, Track, TrackType }
+
 pub enum NIDType {
 	other
 	note
@@ -11,14 +13,24 @@ pub enum NIDType {
 
 @[heap]
 pub struct NID {
+	pub mut:
 	id      u64
 	typ     NIDType
 	ptr     voidptr
-	locked  bool             = true
+	locked  bool            = true
 }
 
 // Returns the data for a packet to mirror across different devices (Note: Mirrors full instance, but not sub-instances (Pattern mirrors Pattern, but not the Notes in Pattern))
 pub fn (nid NID) get_data[T]() []u8 {
-	// TODO : This
+	match nid.typ {
+		.pattern {
+			/*
+			pattern := unsafe { &Pattern(nid.ptr) }
+			mut data := []u8{}
+			*/
+			// data << 
+			return []u8{}
+		}
+		else { return []u8{} }
+	}
 }
-

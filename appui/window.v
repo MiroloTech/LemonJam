@@ -58,6 +58,8 @@ pub fn (mut win Window) init(mut ui UI) {
 		HeaderAction{ name: "Cut"           hotkey: "Ctrl+X" },
 		HeaderAction{ name: "Undo"          hotkey: "Ctrl+Z" },
 		HeaderAction{ name: "Redo"          hotkey: "Ctrl+Y" },
+		HeaderAction{ is_seperator: true },
+		HeaderAction{ name: "Preferences" },
 	]
 	
 	win.header.options["Session"] = [
@@ -129,21 +131,7 @@ pub fn (mut win Window) init(mut ui UI) {
 		pattern_rack.elements << element
 	}
 	
-	// Manage showing of selected patterns
-	win.project.new_pattern_user_data = pattern_rack
-	/*
-	win.project.on_ui_new_pattern = fn (pattern &Pattern, rack_ptr voidptr, ui_ptr voidptr) {
-		mut rack := unsafe { &RackResource(rack_ptr) }
-		mut ui := unsafe { &UI(ui_ptr) }
-		mut element := RackElement.new(pattern.name,  ui.style.color_pattern)
-		element.connect_hook(fn [mut ui] (pattern_ptr voidptr) {
-			// Call hook
-			ui.call_hook("open-pattern", pattern_ptr) or { return }
-		}, pattern)
-		rack.elements << element
-	}
-	// TODO : Remove obsulete on_ui_new_pattern
-	*/
+	win.project.on_net_pattern_created << ui.hooks["add-to-pattern-list"]
 	
 	// TODO : Now display project instruments, effects and sounds in Rack
 	// TODO : Properly implement racks with hooks on re-creation of pattern
