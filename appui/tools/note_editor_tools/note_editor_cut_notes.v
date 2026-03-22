@@ -1,4 +1,4 @@
-module tools
+module note_editor_tools
 
 import gg
 // import sokol.sapp
@@ -9,7 +9,7 @@ import std { Color }
 
 @[heap]
 pub struct ToolCutNotes {
-	EditorTool[NoteUI]
+	NoteEditorTool
 	
 	pub:
 	icon                    string            = "tool-cut"

@@ -1,4 +1,4 @@
-module tools
+module note_editor_tools
 
 import uilib { UI, NoteUI }
 import std.geom2 { Vec2, Rect2 }

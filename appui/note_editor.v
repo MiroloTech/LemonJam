@@ -4,7 +4,7 @@ import gg
 import math { floor, ceil, mod }
 import log
 
-import appui.tools { EditorToolSkeleton, ToolMoveNotes, ToolCutNotes, ToolSelectNotes, ToolPlaceNotes }
+import appui.tools.note_editor_tools { NoteEditorToolSkeleton, ToolMoveNotes, ToolCutNotes, ToolSelectNotes, ToolPlaceNotes, ToolDeleteNotes }
 import audio.objs { Note, Pattern }
 import std { Color }
 import std.geom2 { Vec2, Rect2 }
@@ -41,11 +41,12 @@ pub struct NoteEditor {
 	piano                        Piano            = Piano{}
 	piano_width                  f64              = 180.0
 	
-	tools                        []EditorToolSkeleton[NoteUI] = [
+	tools                        []NoteEditorToolSkeleton = [
 		ToolSelectNotes{},
 		ToolMoveNotes{},
-		ToolCutNotes{}
+		ToolCutNotes{},
 		ToolPlaceNotes{},
+		ToolDeleteNotes{}
 	]
 	selected_tool                int //              = 1
 	
@@ -110,6 +111,7 @@ pub fn (mut editor NoteEditor) event(mut ui UI, event &gg.Event) ! {
 	
 	if event.typ == .mouse_down && editor.hovering_color != -1 {
 		editor.selected_color = editor.hovering_color
+		editor.update_tool_colors()
 		return uilib.surpress_event()
 	}
 	
@@ -572,6 +574,11 @@ pub fn (mut editor NoteEditor) control_tool_bar(mut ui UI, event &gg.Event) ! {
 pub fn (mut editor NoteEditor) open_pattern(pattern &Pattern) {
 	editor.pattern = pattern
 	editor.notes = NoteUI.from_pattern(pattern)
+	
+	// attach new reference to pattern for each tool
+	for mut tool in editor.tools {
+		tool.pattern = pattern
+	}
 }
 
 pub fn (mut editor NoteEditor) init_tools() {
@@ -594,9 +601,37 @@ pub fn (mut editor NoteEditor) init_tools() {
 			fromx := editor.from.x + editor.piano_width + time * editor.pixels_per_beat - editor.scroll_x
 			return Vec2{fromx, rail.a.y}
 		}
+		tool.create_note = fn [mut editor] (note_ui &NoteUI) {
+			// > Add to pattern
+			editor.pattern.notes << note_ui.note
+			editor.pattern.colors[note_ui.note] = editor.colors[editor.selected_color] or { Color.hex("#ff0000") }
+			editor.pattern.instruments[note_ui.note] = unsafe { nil }
+			
+			// > Add to UI
+			editor.notes << note_ui
+		}
+		tool.delete_note = fn [mut editor] (note_ui &NoteUI) {
+			// > Remove from UI
+			list_idx := editor.notes.index(note_ui)
+			if list_idx == -1 { return }
+			editor.notes.delete(list_idx)
+			
+			// > Remove from pattern
+			pattern_idx := editor.pattern.notes.index(note_ui.note)
+			if pattern_idx == -1 { return }
+			editor.pattern.notes.delete(pattern_idx)
+			editor.pattern.colors.delete(note_ui.note)
+			editor.pattern.instruments.delete(note_ui.note)
+		}
 	}
+	editor.update_tool_colors()
 }
 
+fn (mut editor NoteEditor) update_tool_colors() {
+	for mut tool in editor.tools {
+		tool.current_color = editor.colors[editor.selected_color] or { Color.hex("#ff0000") }
+	}
+}
 
 /*
 Next simplified TODO:

@@ -1,4 +1,4 @@
-module tools
+module note_editor_tools
 
 import gg
 
@@ -8,7 +8,7 @@ import std { Color }
 
 @[heap]
 pub struct ToolMoveNotes {
-	EditorTool[NoteUI]
+	NoteEditorTool
 	
 	pub:
 	icon                    string            = "tool-move"
@@ -54,8 +54,6 @@ pub fn (mut tool ToolMoveNotes) event(mut ui UI, event &gg.Event) {
 		}
 		
 		tool.start_time, tool.start_id = tool.grid_world_conv.world_to_grid(ui.mpos)
-		
-		// TODO : Add shift-select for multiple notes
 	}
 	
 	// > Remove all starting data for every note
@@ -78,7 +76,7 @@ pub fn (mut tool ToolMoveNotes) event(mut ui UI, event &gg.Event) {
 			note_ui.note.from = start_time + tool.offset_time
 		}
 		
-		// TODO : Add snapping & clamping
+		// TODO : Add better snapping & clamping
 	}
 }
 
@@ -86,7 +84,7 @@ pub fn (mut tool ToolMoveNotes) draw(mut ui UI) {
 	// Update cursor
 	hovered_note := get_note_at_pos(ui.mpos, tool.elements) // tool.get_note_at_pos(tool.mpos)
 	if hovered_note != unsafe { nil } {
-		ui.set_cursor(.resize_all)
+		ui.set_cursor(.pointing_hand)
 	} else {
 		ui.set_cursor(.default)
 	}

@@ -1,4 +1,4 @@
-module tools
+module note_editor_tools
 
 import gg
 
@@ -9,7 +9,7 @@ import std { Color }
 
 @[heap]
 pub struct ToolSelectNotes {
-	EditorTool[NoteUI]
+	NoteEditorTool
 	
 	pub:
 	icon                    string            = "tool-select"
