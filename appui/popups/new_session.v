@@ -1,7 +1,7 @@
 module popups
 
 import gg
-import log
+import std.log
 
 // import std { Color }
 import app { Project }
@@ -279,7 +279,7 @@ pub fn (mut popup NewSessionPopup) event(mut ui UI, event &gg.Event) ! {
 			server := popup.servers[popup.selected_server]
 			popup.project.start_session(server) or {
 				ui.call_hook("toast-error", "Failed to start session : ${err}".str) or {  }
-				log.error("Failed to start session : ${err}")
+				// log.failed("Failed to start session : ${err}")
 			}
 		}
 		popup.close(mut ui)
@@ -296,13 +296,13 @@ pub fn (mut popup NewSessionPopup) close(mut ui UI) {
 
 pub fn (mut popup NewSessionPopup) fetch_servers() {
 	server_list := Server.fetch_server_list() or {
-		log.error("Failed to fetch list of servers : ${err}")
+		log.failed("Failed to fetch list of servers : ${err}")
 		return
 	}
 	lock popup.servers {
 		popup.servers = server_list
 		for mut server in popup.servers {
-			go server.update_ping()
+			go server.refresh_ping()
 		}
 	}
 }

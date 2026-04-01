@@ -1,12 +1,10 @@
 module note_editor_tools
 
 import gg
-// import sokol.sapp
 
-import audio.objs { Note }
 import uilib { UI, NoteUI }
 import std.geom2 { Vec2 }
-import std { Color }
+import std { Color, ByteStack }
 
 @[heap]
 pub struct ToolPlaceNotes {
@@ -29,25 +27,16 @@ pub fn (mut tool ToolPlaceNotes) event(mut ui UI, event &gg.Event) {
 	if event.typ == .mouse_down && event.mouse_button == .left {
 		if tool.dragging == unsafe { nil } {
 			// Make new note instance here
-			mut note := &Note{
-				nid: unsafe { nil }
-				
-				from: tool.preview_time
-				len: 0.0
-				
-				id: tool.preview_id
-			}
+			mut note := tool.project.new_note_simple(tool.preview_time, 0.0, tool.preview_id, tool.current_color, mut tool.pattern, unsafe { nil })
 			
 			mut note_ui := &NoteUI{
-				color: tool.current_color
 				note: note
 				is_colored: true
 			}
 			
-			// > Get Reference to current pattern
-			// TODO : This (use create_element in EditorTool)
-			// tool.element_manager.create_element(new_note_ui)
 			tool.dragging = note_ui
+			
+			// > Crate note in session context
 			tool.create_note(note_ui)
 		}
 	}
@@ -55,6 +44,7 @@ pub fn (mut tool ToolPlaceNotes) event(mut ui UI, event &gg.Event) {
 		if tool.dragging != unsafe { nil } {
 			// Drag note's length to mouse cursor
 			tool.dragging.note.len = tool.preview_time - tool.dragging.note.from
+			tool.project.update_note(tool.dragging.note)
 		}
 	}
 	if event.typ == .mouse_up {
@@ -62,6 +52,7 @@ pub fn (mut tool ToolPlaceNotes) event(mut ui UI, event &gg.Event) {
 			// Delete note, if it's len is <= 0
 			if tool.dragging.note.len <= 0.0 {
 				tool.delete_note(tool.dragging)
+				tool.project.delete_note(mut tool.pattern, tool.dragging.note)
 			} else {
 				// TODO : Unlock note here
 			}
@@ -91,4 +82,3 @@ pub fn (mut tool ToolPlaceNotes) draw(mut ui UI) {
 	}
 	
 }
-

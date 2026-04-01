@@ -1,6 +1,7 @@
 module objs
 
 import mirrorlib { NID }
+import std { Color }
 import std.ease { EaseFn }
 import std.geom3 { Vec3 }
 
@@ -20,6 +21,7 @@ pub struct Note {
 	pan2       ?Vec3
 	
 	easing     ?EaseFn
+	color      Color        = Color.hex("#ffffff")
 }
 
 pub const tags := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]

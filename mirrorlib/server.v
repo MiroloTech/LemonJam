@@ -1,7 +1,7 @@
 module mirrorlib
 
 import os
-import log
+import std.log
 import x.json2 as json
 
 pub enum ServerStatus {
@@ -26,7 +26,20 @@ pub struct Server {
 }
 
 
-pub fn Server.load_list_from_json(data string) ![]Server {
+pub fn (mut server Server) refresh_ping() {
+	if server.status != .live { return }
+	result := os.execute("ping -i 20 ${server.ip}")
+	if result.output.contains("Average = ") {
+		server.ping = result.output.find_between("Average = ", "ms").f64()
+	} else {
+		log.failed("Ping to ${server.ip} server '${server.title}' failed : ${result.output}")
+		return
+	}
+	
+	// TODO : Send custom ping packet to server with mirrorlib
+}
+
+fn Server.load_list_from_json(data string) ![]Server {
 	raw_data := json.decode[json.Any](data) or { return error("Failed to parse json : ${err}") }
 	mut servers := []Server{}
 	for key, raw_server_data in raw_data.as_map() {
@@ -53,19 +66,6 @@ pub fn Server.load_list_from_json(data string) ![]Server {
 		servers << server
 	}
 	return servers
-}
-
-pub fn (mut server Server) update_ping() {
-	if server.status != .live { return }
-	result := os.execute("ping -i 20 ${server.ip}")
-	if result.output.contains("Average = ") {
-		server.ping = result.output.find_between("Average = ", "ms").f64()
-	} else {
-		log.error("Ping to ${server.ip} server '${server.title}' failed : ${result.output}")
-		return
-	}
-	
-	// TODO : Send custom ping packet to server with mirrorlib
 }
 
 // WARNING : This is temporary debug list for the existing servers, where the Antartic Server is localhost

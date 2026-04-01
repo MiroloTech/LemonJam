@@ -42,9 +42,6 @@ pub fn (mut app App) frame() {
 	app.window.frame(mut app.ui)
 	app.ui.draw()
 	app.ui.ctx.end()
-	
-	// TODO : Maybe split rendering of different bigger objects into different draw calls ( maybe fixes coloring issue in toast text color )
-	// TODO : Add screenshot to github README
 }
 
 pub fn (mut app App) event(event &gg.Event, _ voidptr) {

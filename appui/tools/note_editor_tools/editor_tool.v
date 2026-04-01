@@ -2,6 +2,7 @@ module note_editor_tools
 
 import gg
 
+import app { Project }
 import uilib { UI, NoteUI }
 import audio.objs { Pattern, Instrument }
 import std { Color }
@@ -24,6 +25,7 @@ pub interface NoteEditorToolSkeleton {
 	pattern               &Pattern
 	current_color         Color
 	current_instrument    &Instrument
+	project               &Project
 	
 	grid_world_conv       GridWorldConverter
 	
@@ -55,6 +57,7 @@ pub struct NoteEditorTool implements NoteEditorToolSkeleton {
 	pattern               &Pattern              = unsafe { nil }
 	current_color         Color
 	current_instrument    &Instrument           = unsafe { nil }
+	project               &Project              = unsafe { nil }
 	
 	grid_world_conv       GridWorldConverter
 	

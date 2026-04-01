@@ -1,7 +1,7 @@
 module uilib
 
 import os
-import log
+import std.log
 import gg
 import time
 import sokol.sapp
@@ -69,7 +69,7 @@ pub fn (mut ui UI) push_scissor(scissor_rect Rect2) {
 	ui.scissor_stack << scissor_rect
 	ui.ctx.scissor_rect(
 		int(scissor_rect.a.x), int(scissor_rect.a.y),
-		int(scissor_rect.b.x), int(scissor_rect.b.y),
+		int(scissor_rect.size().x), int(scissor_rect.size().y),
 	)
 }
 
@@ -78,12 +78,12 @@ pub fn (mut ui UI) pop_scissor() {
 	last_rect := if ui.scissor_stack.len > 0 { ui.scissor_stack.last() } else { ui.get_window_rect() }
 	ui.ctx.scissor_rect(
 		int(last_rect.a.x), int(last_rect.a.y),
-		int(last_rect.b.x), int(last_rect.b.y),
+		int(last_rect.size().x), int(last_rect.size().y),
 	)
 }
 
 pub fn (mut ui UI) init() {
-	ui.load_icon_list("${get_appdata_path()}/icons/") or { log.error("Failed to load icon(s) : ${err}") }
+	ui.load_icon_list("${get_appdata_path()}/icons/") or { log.failed("Failed to load icon(s) : ${err}") }
 	println("${ui.icons.len + 1} icons loaded")
 }
 
@@ -205,7 +205,7 @@ pub fn (mut ui UI) event(event &gg.Event) ! {
 
 pub fn (mut ui UI) call_hook(tag string, data voidptr) ! {
 	hook := ui.hooks[tag] or {
-		log.error("Tried calling inexistant hook : ${tag}")
+		log.failed("Tried calling inexistant hook : ${tag}")
 		return error("Tried calling inexistant hook : ${tag}")
 	}
 	hook(data)

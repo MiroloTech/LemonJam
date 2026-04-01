@@ -55,14 +55,23 @@ pub fn extract_appdata() {
 		sub_entries := os.ls(path) or { [] }
 		
 		// >> Create top-level dir
-		os.mkdir(target_path) or { continue }
+		os.mkdir(target_path) or {  }
 		
-		// >> Move evey sub-element to top-level folder
+		// >> Move every sub-element to top-level folder
 		for sub_entry in sub_entries {
 			sub_path := os.join_path(path, sub_entry)
+			/*
+			// This only places new resources in the folders, while leaving old and modified ones untouched
 			if !os.exists(os.join_path(target_path, sub_entry)) {
 				os.mv(sub_path, target_path) or { continue }
 			}
+			*/
+			
+			// This may overwrite existing modifications, which is often intended
+			if os.exists(os.join_path(target_path, sub_entry)) {
+				os.rm(os.join_path(target_path, sub_entry)) or {  }
+			}
+			os.mv(sub_path, target_path) or { continue }
 		}
 	}
 	

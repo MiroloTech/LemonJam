@@ -74,6 +74,7 @@ pub fn (mut tool ToolMoveNotes) event(mut ui UI, event &gg.Event) {
 			start_time := tool.starting_times[i] or { continue }
 			note_ui.note.id = start_id + tool.offset_id
 			note_ui.note.from = start_time + tool.offset_time
+			tool.project.update_note(note_ui.note)
 		}
 		
 		// TODO : Add better snapping & clamping

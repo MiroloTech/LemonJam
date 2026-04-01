@@ -45,3 +45,11 @@ pub fn Rect2.get_overlap_area(a Rect2, b Rect2) f64 {
 	if overlap_height <= 0.0 || overlap_width <= 0.0 { return 0.0 }
 	return overlap_width * overlap_height
 }
+
+pub fn (rect Rect2) inset(depth f64) Rect2 {
+	return Rect2{rect.a + Vec2.v(depth), rect.b - Vec2.v(depth * 2.0)}
+}
+
+pub fn (rect Rect2) offset(o Vec2) Rect2 {
+	return Rect2{rect.a + o, rect.b + o}
+}

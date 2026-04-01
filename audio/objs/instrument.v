@@ -1,8 +1,8 @@
 module objs
 
-import mirrorlib { NID }
+import mirrorlib { NID, Packet }
 
-import log
+import std.log
 
 @[heap]
 pub struct Instrument {
@@ -11,11 +11,11 @@ pub struct Instrument {
 	name         string
 	file         string
 	icon         string
-	instrument   InstrumentSystem      = TempInstrumentSystem{}
+	instrument   &InstrumentSystem
 }
 
 pub fn (mut instrument Instrument) load() ! {
-	instrument.instrument = TempInstrumentSystem{}
+	instrument.instrument = unsafe { nil }
 	// TODO : Load this through .dll or .vst
 }
 
@@ -28,6 +28,10 @@ pub interface InstrumentSystem {
 	
 	read_pcm_frames(notes []&Note, time f64, frame_count u32) []f64
 	load_from_data(data string)
+	
+	// Networking
+	on_packet(packet Packet)
+	send_packet    fn (packet Packet) // Set on init of instrument (is empty / useless function when not connected in a session)
 }
 
 

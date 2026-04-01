@@ -1,7 +1,7 @@
 module mirrorlib
 
 import net
-import log
+import std.log
 import sync
 
 pub const listener_port := 8080
@@ -104,7 +104,7 @@ pub fn (mut conn Conn) update() {
 		
 		// conn.tcp.wait_for_read() or {  }
 	}
-	conn.close() or { log.error("Failed to close connection in update loop : ${err}") }
+	conn.close() or { log.failed("Failed to close connection in update loop : ${err}") }
 }
 
 pub fn (mut conn Conn) send_packet(packet Packet) ! {

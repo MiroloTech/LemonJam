@@ -8,12 +8,13 @@ import std.geom2 { Vec2 }
 @[heap]
 pub struct NoteUI {
 	pub mut:
-	from         Vec2
-	size         Vec2
-	color        Color
-	note         &Note
-	is_selected  bool
-	is_colored   bool
+	from             Vec2
+	size             Vec2
+	// color        Color
+	color_override   ?Color
+	note             &Note
+	is_selected      bool
+	is_colored       bool
 }
 
 
@@ -23,15 +24,15 @@ pub struct NoteUI {
 pub fn NoteUI.from_pattern(pattern &Pattern) []&NoteUI {
 	mut note_uis := []&NoteUI{}
 	for note in pattern.notes {
-		color := pattern.colors[note] or { Color.hex("#ff0000") }
-		note_uis << NoteUI.from_note(note, color)
+		// color := pattern.colors[note] or { Color.hex("#ff0000") }
+		note_uis << NoteUI.from_note(note)
 	}
 	return note_uis
 }
 
-pub fn NoteUI.from_note(note &Note, color Color) &NoteUI {
+// TODO : Migrate all NoteUI.color to Note.color
+pub fn NoteUI.from_note(note &Note) &NoteUI {
 	return &NoteUI{
-		color: color
 		note: note
 	}
 }
@@ -45,7 +46,7 @@ pub fn (note_ui NoteUI) draw(mut ui UI, hashed bool) {
 		note_ui.size,
 		
 		radius: ui.style.rounding
-		fill_color: if hashed { note_ui.color.alpha(0.5) } else { note_ui.color }
+		fill_color: if hashed { note_ui.get_color().alpha(0.5) } else { note_ui.get_color() }
 		
 		fill_type: if hashed { .striped } else { .full }
 	)
@@ -92,4 +93,8 @@ pub fn (note_ui NoteUI) draw_handles(mut ui UI, left bool, right bool) {
 			fill_color: ui.style.color_text
 		)
 	}
+}
+
+pub fn (note_ui NoteUI) get_color() Color {
+	return note_ui.color_override or { note_ui.note.color }
 }

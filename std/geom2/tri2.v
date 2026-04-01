@@ -69,7 +69,7 @@ pub fn Tri2.triangulate(shape []Vec2) []Tri2 {
 	}
 	
 	if pts.len > 4 {
-		// log.error("Triangulation finished unsucessfully : ${pts.len} points remain")
+		// log.failed("Triangulation finished unsucessfully : ${pts.len} points remain")
 	} else if pts.len == 3 {
 		tris << Tri2{pts[0], pts[1], pts[2]}
 	}

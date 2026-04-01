@@ -29,6 +29,13 @@ pub struct Style {
 	color_note_white           Color               = Color.hex("#d3d3d3")
 	color_note_black           Color               = Color.hex("#221c19")
 	
+	color_log_txt              Color               = Color.hex("#e3e3dd")
+	color_log_info             Color               = Color.hex("#56a2e8")
+	color_log_error            Color               = Color.hex("#ff8383")
+	color_log_http             Color               = Color.hex("#b594ff")
+	color_log_tcp              Color               = Color.hex("#3a994c")
+	color_log_udp              Color               = Color.hex("#a98d84")
+	
 	colors_users               []Color             = [
 		Color.hex("#6e757c"), Color.hex("#a98d84"),
 		Color.hex("#3da5b6"), Color.hex("#56a2e8"),

@@ -1,7 +1,6 @@
 module popups
 
 import gg
-import log
 
 import app { Project }
 import std.geom2 { Vec2, Rect2 }
@@ -109,7 +108,7 @@ pub fn (mut popup JoinSessionPopup) join_session(mut ui UI) {
 	code := popup.session_code_edit.text
 	println("Code : ${code}")
 	popup.project.join_session(code) or {
-		log.error("Failed to join session : ${err}")
+		// log.failed("Failed to join session : ${err}")
 		popup.close(mut ui)
 	}
 }

@@ -1,7 +1,7 @@
 module mirrorlib
 
 import net
-import log
+import std.log
 import sync
 
 @[heap]
@@ -122,7 +122,7 @@ pub fn (mut server Server) close() ! {
 	
 	for _, mut conn in server.conns {
 		conn.close() or {
-			log.error("Failed to close connection at '${conn.get_ip()}' : ${err}")
+			log.failed("Failed to close connection at '${conn.get_ip()}' : ${err}")
 			continue
 		}
 	}

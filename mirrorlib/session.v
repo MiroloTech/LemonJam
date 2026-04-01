@@ -1,8 +1,10 @@
 module mirrorlib
 
-import log
 import time
 import encoding.binary { big_endian_u64 }
+
+import std { ByteStack }
+import std.log { Log }
 // import net.http
 // import x.json2 as json
 
@@ -24,6 +26,7 @@ pub struct Session {
 	session_code              string
 	status                    SessionStatus        = .pending
 	conn                      &Conn                = unsafe { nil }
+	log                       &Log
 	
 	on_ready                  ?fn ()
 	can_update                bool                 = true
@@ -45,17 +48,18 @@ pub fn (mut session Session) update() {
 }
 
 // Creates a new Session instance from a new Session on the given server
-pub fn Session.new_session(server Server) !&Session {
-	mut conn := Conn.new(server.ip, true)!
+pub fn Session.new_session(server Server, mut logger Log) !&Session {
+	mut conn := Conn.new(server.ip, true, mut logger)!
 	
 	mut session := &Session{
 		server: server
 		conn: conn
+		log: logger
 	}
 	
 	// Connect basic hooks
-	conn.on_session_created = fn [mut session] (session_code string) {
-		log.info("Created new session with code '${session_code}'.")
+	conn.on_session_created = fn [mut logger, mut session] (session_code string) {
+		logger.info("Created new session with code '${session_code}'.")
 		session.session_code = session_code
 		session.status = .open
 		if session.on_ready != none {
@@ -68,7 +72,7 @@ pub fn Session.new_session(server Server) !&Session {
 	conn.send_packet(create_session_packet) or { return error("Failed to join create-session-packet : ${err}") }
 	
 	// Log
-	log.info("User sent new session creation request to '${server.ip}'.")
+	logger.info("User sent new session creation request to '${server.ip}'.")
 	
 	// TODO : Await createion here
 	
@@ -78,33 +82,34 @@ pub fn Session.new_session(server Server) !&Session {
 }
 
 // Creates a new Session instance, connected through the conn to an already-existing Session on the given server
-pub fn Session.join_session(session_code string) !&Session {
+pub fn Session.join_session(session_code string, mut logger Log) !&Session {
 	// > Find Server for session by checking suffix of code
 	server := find_server_from_prefix(session_code) or {
 		return error("Failed to find server from given Session Code :${err}")
 	}
 	
 	// > Create new connection to server
-	mut conn := Conn.new(server.ip, false)!
+	mut conn := Conn.new(server.ip, false, mut logger)!
 	
 	// > Create Session Instance
 	mut session := &Session{
 		server: server
 		session_code: session_code
 		conn: conn
+		log: logger
 	}
 	
 	// > Connect session join confirmation / failiure hook
-	conn.on_session_connect = fn [mut session] () {
-		log.info("Session joined successfully")
+	conn.on_session_connect = fn [mut logger, mut session] () {
+		logger.info("Session joined successfully")
 		session.status = .open
 		if session.on_ready != none {
 			session.on_ready()
 		}
 	}
 	
-	conn.on_server_error = fn [mut session] (error string) {
-		log.error("Failed to join session : ${error}")
+	conn.on_server_error = fn [mut logger, mut session] (error string) {
+		logger.failed("Failed to join session : ${error}")
 		session.status = .failed
 	}
 	
@@ -129,7 +134,7 @@ pub fn Session.join_session(session_code string) !&Session {
 
 pub fn (mut session Session) on_packet(packet Packet) {
 	if packet.data.len < 8 { return }
-	mut bytes := PacketBytes(packet.data.clone())
+	mut bytes := ByteStack(packet.data.clone())
 	nid := bytes.pop_u64()
 	match packet.action {
 		action_element_create {
@@ -163,7 +168,7 @@ pub fn (mut session Session) on_packet(packet Packet) {
 
 pub fn (mut session Session) send_packet(packet Packet) {
 	session.conn.send_packet(packet) or {
-		log.error("Failed to send packet '${packet.action}' from Session : ${err}")
+		session.log.failed("Failed to send packet '${packet.action}' from Session : ${err}")
 	}
 }
 
@@ -194,7 +199,7 @@ pub fn (mut session Session) wait_until_ready() ! {
 
 pub fn (mut session Session) init_hooks() {
 	if session.conn == unsafe { nil } {
-		log.error("Can't initiaize connection hooks at the moment : Connection no initialized")
+		log.failed("Can't initiaize connection hooks at the moment : Connection no initialized")
 		return
 	}
 	
@@ -214,7 +219,7 @@ pub fn (mut session Session) get_new_nid() !u64 {
 	}
 	
 	// > Wait for repsonse
-	nid_packet := session.conn.wait_for_packet(action_new_nid, nid_request_timeout) or {
+	nid_packet := session.conn.await_packet_by_action(action_new_nid, nid_request_timeout) or {
 		return error("Waiting for new NID from server timed out : ${err}")
 	}
 	

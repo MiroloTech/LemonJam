@@ -2,13 +2,14 @@ module appui
 
 import gg
 import math { floor, ceil, mod }
-import log
+import std.log
 
-import appui.tools.note_editor_tools { NoteEditorToolSkeleton, ToolMoveNotes, ToolCutNotes, ToolSelectNotes, ToolPlaceNotes, ToolDeleteNotes }
+import app { Project }
 import audio.objs { Note, Pattern }
 import std { Color }
 import std.geom2 { Vec2, Rect2 }
 import uilib { UI, ActionList, Piano, NoteUI }
+import appui.tools.note_editor_tools { NoteEditorToolSkeleton, ToolMoveNotes, ToolCutNotes, ToolSelectNotes, ToolPlaceNotes, ToolDeleteNotes }
 
 @[heap]
 pub struct NoteEditor {
@@ -69,7 +70,7 @@ const note_tags := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", 
 pub fn (mut editor NoteEditor) draw(mut ui UI) {
 	ui.push_scissor(a: editor.from, b: editor.from + editor.size)
 	
-	ui.push_scissor(a: editor.from + Vec2{0.0, editor.header_height}, b: editor.from + editor.size - Vec2{0.0, editor.header_height})
+	ui.push_scissor(a: editor.from + Vec2{0.0, editor.header_height}, b: editor.from + editor.size)
 	editor.draw_piano(mut ui, editor.from + Vec2{0.0, editor.header_height}, editor.size - Vec2{0.0, editor.header_height})
 	editor.draw_notes(mut ui)
 	editor.draw_bar_lines(mut ui)
@@ -192,7 +193,7 @@ pub fn (mut editor NoteEditor) draw_piano(mut ui UI, from Vec2, size Vec2) {
 
 
 pub fn (mut editor NoteEditor) draw_notes(mut ui UI) {
-	rect := Rect2{a: editor.from + Vec2{editor.piano_width, editor.header_height}, b: editor.from + editor.size - Vec2{editor.piano_width, editor.header_height}}
+	rect := Rect2{a: editor.from + Vec2{editor.piano_width, editor.header_height}, b: editor.from + editor.size}
 	ui.push_scissor(rect)
 	rails := editor.piano.get_piano_rails(rect.a + Vec2{editor.piano.size.x, 0.0}, rect.size())
 	
@@ -210,7 +211,7 @@ pub fn (mut editor NoteEditor) draw_notes(mut ui UI) {
 		
 		// > Draw Note
 		selected_color := editor.colors[editor.selected_color] or { Color.hex("#ffffff") }
-		is_hashed := note_ui.color != selected_color
+		is_hashed := note_ui.get_color() != selected_color
 		note_ui.is_colored = !is_hashed
 		note_ui.draw(mut ui, is_hashed)
 	}
@@ -220,7 +221,7 @@ pub fn (mut editor NoteEditor) draw_notes(mut ui UI) {
 
 
 pub fn (editor NoteEditor) draw_bar_lines(mut ui UI) {
-	ui.push_scissor(a: editor.from + Vec2{editor.piano_width - 1, editor.header_height * 0.75}, b: editor.from + editor.size - Vec2{editor.piano_width, editor.header_height * 0.75})
+	ui.push_scissor(a: editor.from + Vec2{editor.piano_width - 1, editor.header_height * 0.75}, b: editor.from + editor.size)
 	
 	// Draw beat & bar lines
 	lines := int(ceil(editor.size.x / editor.pixels_per_beat)) + 1
@@ -581,7 +582,7 @@ pub fn (mut editor NoteEditor) open_pattern(pattern &Pattern) {
 	}
 }
 
-pub fn (mut editor NoteEditor) init_tools() {
+pub fn (mut editor NoteEditor) init_tools(mut project &Project) {
 	for mut tool in editor.tools {
 		tool.grid_world_conv.world_to_grid = fn [mut editor] (pos Vec2) (f64, int) {
 			rect := Rect2{editor.from + Vec2{editor.piano_width, editor.header_height}, editor.from + editor.size - Vec2{editor.piano_width, editor.header_height}}
@@ -602,11 +603,13 @@ pub fn (mut editor NoteEditor) init_tools() {
 			return Vec2{fromx, rail.a.y}
 		}
 		tool.create_note = fn [mut editor] (note_ui &NoteUI) {
+			/*
 			// > Add to pattern
 			editor.pattern.notes << note_ui.note
-			editor.pattern.colors[note_ui.note] = editor.colors[editor.selected_color] or { Color.hex("#ff0000") }
+			// editor.pattern.colors[note_ui.note] = editor.colors[editor.selected_color] or { Color.hex("#ff0000") }
 			editor.pattern.instruments[note_ui.note] = unsafe { nil }
 			
+			*/
 			// > Add to UI
 			editor.notes << note_ui
 		}
@@ -617,12 +620,15 @@ pub fn (mut editor NoteEditor) init_tools() {
 			editor.notes.delete(list_idx)
 			
 			// > Remove from pattern
+			/*
 			pattern_idx := editor.pattern.notes.index(note_ui.note)
 			if pattern_idx == -1 { return }
 			editor.pattern.notes.delete(pattern_idx)
-			editor.pattern.colors.delete(note_ui.note)
+			// editor.pattern.colors.delete(note_ui.note)
 			editor.pattern.instruments.delete(note_ui.note)
+			*/
 		}
+		tool.project = project
 	}
 	editor.update_tool_colors()
 }

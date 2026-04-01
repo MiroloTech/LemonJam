@@ -1,67 +1,46 @@
 module uilib
 
-import gg
-
-import std.geom2 { Vec2 }
-
-pub type HorizontalAlign = gg.HorizontalAlign
-pub type VerticalAlign = gg.VerticalAlign
-
-pub struct Text {
+@[params]
+pub struct TrimConfig {
 	pub mut:
-	from       Vec2
-	size       Vec2
-	text       string
+	delimiter_charset           string            = " -"   // If the delimiter_charset is not "", the text can only be trimmed at any of the given charecters in the char set
+	continuation                string            = "..."  // Text, that is trimmed away is replaces with the continuation: "This is a very long text" -> "This is..."
+	trim_delimiter              bool                       // If true and a delimiter charecter set is set, trimming will occur before the matching delimiter, not after
 	
-	mono       bool
-	bold       bool
-	italic     bool
-	
-	halign     HorizontalAlign
-	valign     VerticalAlign
+	// Text Style Config
+	font_size                   int               = 16
+	font_family                 string
 }
 
-
-pub fn (mut text Text) draw(mut ui UI) {
-	// TODO : Multiline support
-	// > Determine text position
-	mut p := text.from
-	if text.halign == .center {
-		p.x += text.size.x * 0.5
-	}
-	else if text.halign == .right {
-		p.x += text.size.x
-	}
-	
-	if text.valign == .middle || text.valign == .baseline {
-		p.y += text.size.y * 0.5
-	}
-	else if text.valign == .bottom {
-		p.y += text.size.y
-	}
-	
-	// > Determine font
-	mut font := ui.style.font_regular
-	if text.mono && text.italic {
-		font = ui.style.font_bold_italic
-	} else if text.bold {
-		font = ui.style.font_bold
-	} else if text.italic {
-		font = ui.style.font_italic
-	}
-	if text.mono {
-		font = ui.style.font_mono
-	}
-	
-	// > Draw text
-	ui.ctx.draw_text(
-		int(p.x), int(p.y),
-		text.text,
-		color: ui.style.color_text.get_gx()
-		size: ui.style.font_size
-		align: text.halign
-		vertical_align: text.valign
-		max_width: int(text.size.x)
-		family: font
+// Turns "This is a very long long text" with trim_text() and a continuation of "..." into "This is a very..."
+pub fn (mut ui UI) trim_text(text string, max_width f64, config TrimConfig) string {
+	// Setup text styling
+	ui.ctx.set_text_cfg(
+		size: config.font_size
+		family: config.font_family
 	)
+	
+	// Loop through every charecter, add that to the total string and check, if it is to wide
+	mut s := ""
+	mut intermediate := ""
+	for i, c8 in text {
+		c := c8.ascii_str()
+		intermediate += c
+		total := s + intermediate + config.continuation
+		width := ui.ctx.text_width(total)
+		if width > max_width {
+			if i == 0 {
+				return ""
+			}
+			if config.trim_delimiter {
+				return s.trim_right(config.delimiter_charset) + config.continuation
+			}
+			return s + config.continuation
+		}
+		if config.delimiter_charset.contains(c) {
+			s += intermediate
+			intermediate = ""
+		}
+	}
+	return text
 }

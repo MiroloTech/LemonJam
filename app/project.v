@@ -1,14 +1,13 @@
 module app
 
 import audio.objs { Instrument, Pattern, Effect, Note, Track, TrackType }
-import mirrorlib { NID, NIDType, Server, Conn, Session, PacketBytes }
-import uilib { UI }
-
-import std { Color }
+import std { Color, ByteStack }
+import mirrorlib { NID, NIDType, Packet, Server, Conn, Session }
+import uilib { UI, NoteUI }
 
 import semver
 import os
-import log
+import std.log { Log }
 import x.json2 as json
 
 @[heap]
@@ -26,12 +25,18 @@ pub struct Project {
 	patterns                    []&Pattern
 	tracks                      []&Track
 	
+	log                         &Log                    = &Log{}
+	
 	// Hooks
 	ui_ptr                      voidptr
 	
+	// TODO : Use custom Signal Data Type here and cary over the .typ of the data as attribute
 	on_net_pattern_created      []fn (pattern &Pattern)
-	on_net_pattern_changed      []fn (pattern &Pattern)
+	on_net_pattern_updated      []fn (pattern &Pattern)
 	on_net_pattern_deleted      []fn (pattern &Pattern)
+	on_net_note_created         []fn (pattern &Note)
+	on_net_note_updated         []fn (pattern &Note)
+	on_net_note_deleted         []fn (pattern &Note)
 }
 
 pub fn (project Project) save_to_file(path string) ! {
@@ -97,8 +102,9 @@ pub fn (mut project Project) load_from_file(path string) ! {
 		note_colors := raw_note_colors.as_map()
 		for color, raw_note_ids in note_colors {
 			for note_id in raw_note_ids.as_array() {
-				note := pattern.notes[note_id.int()] or { continue }
-				pattern.colors[note] = Color.hex(color.str())
+				mut note := pattern.notes[note_id.int()] or { continue }
+				// pattern.colors[note] = Color.hex(color.str())
+				note.color = Color.hex(color.str())
 			}
 		}
 		
@@ -162,7 +168,7 @@ pub fn (mut project Project) new_nid(typ NIDType, data_ptr voidptr) &NID {
 	}
 	
 	nid := project.session.get_new_nid() or {
-		log.error("Failed to get new NID from Session Server : ${err}")
+		log.failed("Failed to get new NID from Session Server : ${err}")
 		return unsafe { nil }
 	}
 	mut nid_instance := &NID{
@@ -189,6 +195,7 @@ pub fn (mut project Project) unlock_nid(mut nid &NID) {
 // ===== EDITOR CONTROLS =====
 // Creates a new pattern and mirrors that in the seesion
 pub fn (mut project Project) new_pattern(name string, color Color) &Pattern {
+	// Create pattern instance
 	mut pattern := &Pattern{
 		name: name
 		color: color
@@ -197,6 +204,17 @@ pub fn (mut project Project) new_pattern(name string, color Color) &Pattern {
 	}
 	pattern.nid = project.new_nid(.pattern, pattern)
 	project.patterns << pattern
+	
+	// Create pattern within session
+	if project.session != unsafe { nil } {
+		mut data := ByteStack{}
+		data.push_u64(pattern.nid.id)
+		data.push_u8(u8(NIDType.pattern))
+		data.push_string(name)
+		data.push_color(color)
+		project.session.send_packet(Packet{action: mirrorlib.action_element_create, data: data})
+	}
+	
 	return pattern
 }
 
@@ -229,6 +247,73 @@ pub fn (mut project Project) new_track(title string, typ TrackType) !&Track {
 }
 
 
+// NOTES
+pub fn (mut project Project) new_note_simple(from f64, len f64, id int, color Color, mut pattern Pattern, instrument &Instrument) &Note {
+	mut note := &Note{
+		nid: unsafe { nil }
+		from: from
+		len: len
+		id: id
+		color: color
+	}
+	note.nid = project.new_nid(.note, note)
+	pattern.notes << note
+	pattern.instruments[note] = instrument
+	
+	// Create note in pattern within session
+	if project.session != unsafe { nil } {
+		mut data := ByteStack{}
+		data.push_u64(note.nid.id)
+		data.push_u8(u8(NIDType.note))
+		data.push_u64(pattern.nid.id)
+		data.push_u64(0) // data.push_u64(instrument.nid.id)
+		data.push_int(note.id)
+		data.push_f64(note.from)
+		data.push_f64(note.len)
+		data.push_f64(note.volume)
+		data.push_vec3(note.pan)
+		data.push_color(note.color)
+		project.session.send_packet(Packet{action: mirrorlib.action_element_create, data: data})
+	}
+	
+	return note
+}
+
+pub fn (mut project Project) update_note(note &Note) {
+	if project.session != unsafe { nil } {
+		mut data := ByteStack{}
+		data.push_u64(note.nid.id)
+		data.push_u8(u8(NIDType.note))
+		data.push_int(note.id)
+		data.push_f64(note.from)
+		data.push_f64(note.len)
+		data.push_f64(note.volume)
+		data.push_vec3(note.pan)
+		data.push_color(note.color)
+		project.session.send_packet(Packet{action: mirrorlib.action_element_update, data: data})
+	}
+}
+
+pub fn (mut project Project) delete_note(mut pattern Pattern, note &Note) {
+	idx := pattern.notes.index(note)
+	if idx != -1 {
+		pattern.notes.delete(idx)
+		pattern.instruments.delete(note)
+	} else {
+		project.log.failed("Failed to delete Note on client side : Note seems to already be non-existant")
+	}
+	
+	if project.session != unsafe { nil } {
+		mut data := ByteStack{}
+		data.push_u64(note.nid.id)
+		data.push_u8(u8(NIDType.note))
+		data.push_u64(pattern.nid.id)
+		project.session.send_packet(Packet{action: mirrorlib.action_element_delete, data: data})
+	}
+}
+
+
+// WTF is this for, I forgot?!
 pub fn (mut project Project) update_ui_from_save_file(mut ui UI) {
 	for pattern in project.patterns {
 		ui.call_hook("add-to-pattern-list", pattern) or {  }
@@ -238,16 +323,23 @@ pub fn (mut project Project) update_ui_from_save_file(mut ui UI) {
 // ========== SESSION CONTROLS ==========
 
 pub fn (mut project Project) start_session(server Server) ! {
-	log.info("Starting new session at server '${server.title}' ...")
-	project.session = Session.new_session(server) or { return error("Failed to start Session : ${err}") }
+	project.log.info("Starting new session at server '${server.title}' ...")
+	
+	project.session = Session.new_session(server, mut project.log) or {
+		project.log.failed("Failed to start session : ${err}")
+		return error("Failed to start Session : ${err}")
+	}
 	// TODO : Make sure, this freezes until ready or failes before continuing
 	project.connect_session()
 	println("Session ready!")
 }
 
 pub fn (mut project Project) join_session(code string) ! {
-	log.info("Joining new session with code '${code}' ...")
-	project.session = Session.join_session(code) or { return error("Failed to join Session : ${err}") }
+	project.log.info("Joining new session with code '${code}' ...")
+	project.session = Session.join_session(code, mut project.log) or {
+		project.log.failed("Failed to join session : ${err}")
+		return error("Failed to join Session : ${err}")
+	}
 	// TODO : Make sure, this freezes until ready or failes before continuing
 	project.connect_session()
 	println("Session ready!")
@@ -256,13 +348,12 @@ pub fn (mut project Project) join_session(code string) ! {
 // This function connects session packet-hooks to the project instance to allow for proper reactions to events
 pub fn (mut project Project) connect_session() {
 	if project.session == unsafe { nil } {
-		log.error("Failed to properly connect session hooks to the project : Session not initialized")
+		log.failed("Failed to properly connect session hooks to the project : Session not initialized")
 		return
 	}
 	
 	project.session.on_packet_create = fn [mut project] (nid_id u64, data []u8) {
-		mut bytes := PacketBytes(data.clone())
-		println("Managing new-pattern packet : ${bytes}")
+		mut bytes := ByteStack(data.clone())
 		
 		typ := bytes.pop_u8()
 		match typ {
@@ -311,12 +402,12 @@ pub fn (mut project Project) connect_session() {
 				
 				// > Fetch existing pattern and instrument for a proper connection
 				mut pattern := project.get_pattern_by_nid(pattern_nid) or {
-					log.error("Tried to add a note to a pattern, that doesn't exist (yet) : Pattern NID '${pattern_nid}'.")
+					project.log.failed("Tried to add a note to a pattern, that doesn't exist (yet) : Pattern NID '${pattern_nid}'.")
 					return
 				}
 				
 				mut instrument := project.get_instrument_by_nid(instrument_nid) or {
-					log.error("Tried to add a note to a pattern, that doesn't exist (yet) : Pattern NID '${pattern_nid}'.")
+					project.log.failed("Tried to add a note to a pattern, that doesn't exist (yet) : Instrument NID '${pattern_nid}'.")
 					// return
 					unsafe { nil }
 				} // TODO : Instrument support
@@ -336,12 +427,90 @@ pub fn (mut project Project) connect_session() {
 					id: id
 					volume: volume
 					pan: pan
+					color: color
 				}
 				
 				// > Add note to pattern
 				pattern.notes << note
-				pattern.colors[note] = color
 				pattern.instruments[note] = instrument
+				
+				// > Call hook after note is created
+				for func in project.on_net_note_created {
+					func(note)
+				}
+			}
+			else {  }
+		}
+	}
+	
+	project.session.on_packet_update = fn [mut project] (nid_id u64, data []u8) {
+		mut bytes := ByteStack(data.clone())
+		
+		typ := bytes.pop_u8()
+		match typ {
+			u8(NIDType.note) { // Notes
+				id := bytes.pop_int()
+				from := bytes.pop_f64()
+				len := bytes.pop_f64()
+				volume := bytes.pop_f64()
+				pan := bytes.pop_vec3()
+				color := bytes.pop_color()
+				
+				// > Create new Note
+				mut note := project.get_note_by_nid(nid_id) or {
+					project.log.failed("Tried to fetch existing note, that doesn't exist (yet) : Note NID '${nid_id}'.")
+					return
+				}
+				
+				note.from = from
+				note.len = len
+				note.id = id
+				note.volume = volume
+				note.pan = pan
+				note.color = color
+				
+				// > Call hook after note is created
+				for func in project.on_net_note_updated {
+					func(note)
+				}
+			}
+			else {  }
+		}
+	}
+	
+	project.session.on_packet_delete = fn [mut project] (nid_id u64, data []u8) {
+		mut bytes := ByteStack(data.clone())
+		
+		typ := bytes.pop_u8()
+		match typ {
+			u8(NIDType.note) { // Notes
+				pattern_nid := bytes.pop_u64()
+				
+				// > Create new Note
+				mut note := project.get_note_by_nid(nid_id) or {
+					project.log.failed("Tried to fetch existing note, that doesn't exist (yet) : Note NID '${nid_id}'.")
+					return
+				}
+				
+				// > Fetch existing pattern for a proper removal
+				mut pattern := project.get_pattern_by_nid(pattern_nid) or {
+					project.log.failed("Tried to add a note to a pattern, that doesn't exist (yet) : Pattern NID '${pattern_nid}'.")
+					return
+				}
+				
+				// > Remove note from pattern, if exists
+				idx := pattern.notes.index(note)
+				if idx != -1 {
+					pattern.notes.delete(idx)
+				}
+				if pattern.instruments.keys().contains(voidptr(note)) {
+					pattern.instruments.delete(note)
+				}
+				
+				// > Call hook after note is created
+				for func in project.on_net_note_deleted {
+					func(note)
+				}
 			}
 			else {  }
 		}
@@ -351,16 +520,15 @@ pub fn (mut project Project) connect_session() {
 
 // ===== UTILLITY =====
 
-// fn (project Project) find_project_by_nid(nid &NID) !int  // TODO
-
 pub fn get_app_version() string {
 	vmod := @VMOD_FILE
 	return vmod.find_between("version: '", "'")
 }
 
 
-pub fn (project &Project) get_pattern_by_nid(nid u64) !&Pattern {
-	for pattern in project.patterns {
+pub fn (mut project Project) get_pattern_by_nid(nid u64) !&Pattern {
+	for mut pattern in project.patterns {
+		if pattern.nid == unsafe { nil } { continue }
 		if pattern.nid.id == nid {
 			return pattern
 		}
@@ -368,11 +536,25 @@ pub fn (project &Project) get_pattern_by_nid(nid u64) !&Pattern {
 	return error("No Pattern with given nid '${nid}' exists.")
 }
 
-pub fn (project &Project) get_instrument_by_nid(nid u64) !&Instrument {
-	for instrument in project.instruments {
+pub fn (mut project Project) get_instrument_by_nid(nid u64) !&Instrument {
+	for mut instrument in project.instruments {
+		if instrument.nid == unsafe { nil } { continue }
 		if instrument.nid.id == nid {
 			return instrument
 		}
 	}
 	return error("No Instrument with given nid '${nid}' exists.")
+}
+
+pub fn (mut project Project) get_note_by_nid(nid u64) !&Note {
+	for mut pattern in project.patterns {
+		if pattern.nid == unsafe { nil } { continue }
+		for mut note in pattern.notes {
+			if note.nid == unsafe { nil } { continue }
+			if note.nid.id == nid {
+				return note
+			}
+		}
+	}
+	return error("No Note with given nid '${nid}' exists.")
 }

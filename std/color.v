@@ -1,6 +1,6 @@
 module std
 
-import math  { max, min }
+import math  { max, min, pow }
 import gg as gglib
 import term.ui as tui
 
@@ -329,6 +329,14 @@ pub fn (c Color) get_tui() tui.Color {
 pub fn (c Color) get_gx() gglib.Color {
 	r, g, b, a := c.get_rgba8()
 	return gglib.Color{r, g, b, a}
+}
+
+// Returns the respective brightness, the eye preceives the color as. Returns a number from 0.0 to 1.0
+pub fn (c Color) luminance() f64 {
+	r_lin := if c.r <= 0.04045 { c.r / 12.92 } else { pow((c.r + 0.055) / 1.055, 2.4) }
+	g_lin := if c.g <= 0.04045 { c.g / 12.92 } else { pow((c.g + 0.055) / 1.055, 2.4) }
+	b_lin := if c.b <= 0.04045 { c.b / 12.92 } else { pow((c.b + 0.055) / 1.055, 2.4) }
+	return r_lin * 0.2126 + g_lin * 0.7152 + b_lin * 0.0722
 }
 
 

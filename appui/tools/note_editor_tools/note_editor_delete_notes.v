@@ -34,10 +34,9 @@ pub fn (mut tool ToolDeleteNotes) event(mut ui UI, event &gg.Event) {
 		if hovered_note != unsafe { nil } {
 			if !tool.queue.contains(hovered_note) {
 				tool.queue << hovered_note
-				tool.queue_colors << hovered_note.color
 				
 				// > Highlight note to delete
-				hovered_note.color = ui.style.color_grey
+				hovered_note.color_override = ui.style.color_grey
 			}
 		}
 	}
@@ -68,6 +67,7 @@ pub fn (mut tool ToolDeleteNotes) draw(mut ui UI) {
 fn (mut tool ToolDeleteNotes) delete_all_in_queue() {
 	// Remove all hovered notes
 	for note in tool.queue {
+		tool.project.delete_note(mut tool.pattern, note.note)
 		tool.delete_note(note)
 	}
 	
@@ -78,8 +78,8 @@ fn (mut tool ToolDeleteNotes) delete_all_in_queue() {
 
 fn (mut tool ToolDeleteNotes) cancel_deletion() {
 	// Restore colors
-	for i, mut note in tool.queue {
-		note.color = tool.queue_colors[i] or { Color.hex("#ff0000") }
+	for mut note_ui in tool.queue {
+		note_ui.color_override = ?Color(none)
 	}
 	
 	// Clear queue

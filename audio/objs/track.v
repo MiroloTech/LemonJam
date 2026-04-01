@@ -1,6 +1,6 @@
 module objs
 
-import log
+import std.log
 
 import std { Color }
 import mirrorlib { NID }
@@ -51,7 +51,7 @@ pub fn (mut track Track) add_element(obj &TrackElementType, from f64, len f64) {
 		track.colors[element] = Color.hex("#b594ff") // TODO : Set this through the save file
 		track.elements << element
 	} else {
-		log.error("Can't add object of type ${obj.type_name()} to a track with expected type ${track.typ}")
+		log.failed("Can't add object of type ${obj.type_name()} to a track with expected type ${track.typ}")
 		return
 	}
 }

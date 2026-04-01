@@ -1,11 +1,11 @@
 module main
 
 import gg
-import log
+import std.log
 import mirrorlib { Server, Client, Packet, NetworkInstance }
 
 import std.geom2 { Vec2 }
-import uilib { UI, Button, Toaster, LineEdit, Text }
+import uilib { UI, Button, Toaster, LineEdit }
 
 @[heap]
 pub struct App {
@@ -71,7 +71,7 @@ pub fn (mut app App) init() {
 				}
 			) or {
 				app.toaster.add_toast("Failed to init server : ${err}", .error, 5.0)
-				log.error("Failed to init server : ${err}")
+				log.failed("Failed to init server : ${err}")
 				return
 			}
 			
@@ -112,7 +112,7 @@ pub fn (mut app App) init() {
 				}
 			) or {
 				app.toaster.add_toast("Failed to init client : ${err}", .error, 5.0)
-				log.error("Failed to init client : ${err}")
+				log.failed("Failed to init client : ${err}")
 				return
 			}
 			
@@ -139,7 +139,7 @@ pub fn (mut app App) init() {
 			if app.mirror != none {
 				app.mirror.close() or {
 					app.toaster.add_toast("Failed to close Net instance : ${err}", .error, 5.0)
-					log.error("Failed to close Net instance : ${err}")
+					log.failed("Failed to close Net instance : ${err}")
 				}
 				app.mirror = ?&NetworkInstance(none)
 			}
@@ -218,7 +218,7 @@ pub fn (mut app App) event(event &gg.Event, _ voidptr) {
 pub fn (mut app App) cleanup() {
 	if app.mirror != none {
 		app.mirror.close() or {
-			log.error("Failed to properly close mirror instance : ${err}")
+			log.failed("Failed to properly close mirror instance : ${err}")
 			return
 		}
 		println("Mirror closed")

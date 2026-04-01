@@ -1,7 +1,7 @@
 module mirrorlib
 
 import net
-import log
+import std.log
 
 @[heap]
 pub struct Client {
@@ -47,7 +47,7 @@ pub fn (mut client Client) send_packet(packet Packet) {
 // Closes current connection
 pub fn (mut client Client) close() ! {
 	client.conn.close() or {
-		log.error("Failed to close local client connection : ${err}")
+		log.failed("Failed to close local client connection : ${err}")
 		return
 	}
 }

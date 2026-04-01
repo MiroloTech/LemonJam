@@ -1,6 +1,7 @@
 module mirrorlib
 
 // List of basic action codes for easier use
+// TODO : Make this an enum
 
 pub const action_join_session                  := u32(1)
 pub const action_create_session                := u32(2)
@@ -17,3 +18,19 @@ pub const action_element_lock                  := u32(12)
 pub const action_element_unlock                := u32(13)
 
 pub const internal_actions                     := [ u32(1), 2, 3, 4, 5, 6, 7 ]
+
+pub const action_tags := {
+	action_join_session:                          "action_join_session",
+	action_create_session:                        "action_create_session",
+	action_user_connected:                        "action_user_connected",
+	action_session_code_confirmation:             "action_session_code_confirmation",
+	action_heartbeat:                             "action_heartbeat",
+	action_server_error:                          "action_server_error",
+	action_session_join_confirmation:             "action_session_join_confirmation",
+	action_new_nid:                               "action_new_nid",
+	action_element_create:                        "action_element_create",
+	action_element_update:                        "action_element_update",
+	action_element_delete:                        "action_element_delete",
+	action_element_lock:                          "action_element_lock",
+	action_element_unlock:                        "action_element_unlock",
+}

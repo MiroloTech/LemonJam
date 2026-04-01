@@ -1,15 +1,15 @@
 module appui
 
 import gg
-import log
 
 // import std { Color }
+import std.log { Log }
 import std.geom2 { Vec2 }
 import std.project { get_appdata_path }
 import app { Project }
-import audio.objs { Pattern }
-import uilib { UI, Toaster, HSplit, VSplit }
-import appui.popups { NewPatternPopup, NewSessionPopup, JoinSessionPopup }
+import audio.objs { Pattern, Note }
+import uilib { UI, Toaster, HSplit, VSplit, NoteUI }
+import appui.popups { NewPatternPopup, NewSessionPopup, JoinSessionPopup, LoggerPopup }
 
 pub struct Window {
 	pub mut:
@@ -37,6 +37,7 @@ pub fn (mut win Window) init(mut ui UI) {
 	
 	// Init project
 	win.project = &Project{}
+	win.project.log = &Log{}
 	win.project.ui_ptr = &ui
 	
 	// Init header
@@ -83,6 +84,15 @@ pub fn (mut win Window) init(mut ui UI) {
 			)
 		} user_data: mut ui}
 		HeaderAction{ name: "Stop Session"  disabled: true }
+		HeaderAction{ name: "Open Logger"                                   on_selected: fn [mut win] (_ string, ui_ptr voidptr) {
+			mut ui := unsafe { &UI(ui_ptr) }
+			ui.popups << LoggerPopup.new(
+				ui,
+				ui.top_left() + Vec2.v(150),
+				ui.bottom_right() - Vec2.v(300),
+				mut win.project
+			)
+		} user_data: mut ui }
 	]
 	win.header.init(mut ui)
 	
@@ -131,8 +141,6 @@ pub fn (mut win Window) init(mut ui UI) {
 		pattern_rack.elements << element
 	}
 	
-	win.project.on_net_pattern_created << ui.hooks["add-to-pattern-list"]
-	
 	// TODO : Now display project instruments, effects and sounds in Rack
 	// TODO : Properly implement racks with hooks on re-creation of pattern
 	
@@ -157,45 +165,17 @@ pub fn (mut win Window) init(mut ui UI) {
 		}) // > Connect hook to create new sound
 	]
 	
-	// Init note editor
-	/*
-	note1  := Note{from: 0.0, len: 4.0, id: 24 + 1}
-	note2  := Note{from: 0.0, len: 4.0, id: 24 + 6}
-	note3  := Note{from: 0.0, len: 4.0, id: 24 + 8}
-	note4  := Note{from: 0.0, len: 4.0, id: 24 + 10}
-	
-	note5  := Note{from: 4.0, len: 4.0, id: 24 + 1}
-	note6  := Note{from: 4.0, len: 4.0, id: 24 + 5}
-	note7  := Note{from: 4.0, len: 4.0, id: 24 + 8}
-	
-	note8  := Note{from: 8.0, len: 4.0, id: 24 + -1}
-	note9  := Note{from: 8.0, len: 4.0, id: 24 + 4}
-	note10 := Note{from: 8.0, len: 4.0, id: 24 + 8}
-	
-	note11 := Note{from: 12.0, len: 4.0, id: 24 + -1}
-	note12 := Note{from: 12.0, len: 4.0, id: 24 + 3}
-	note13 := Note{from: 12.0, len: 4.0, id: 24 + 6}
-	note14 := Note{from: 12.0, len: 4.0, id: 24 + 11}
-	win.note_editor.notes = [ &note1, &note2, &note3, &note4, &note5, &note6, &note7, &note8, &note9, &note10, &note11, &note12, &note13, &note14 ]
-	*/
-	
-	win.project.load_from_file("${get_appdata_path()}/projects/temp.json") or { log.error("Failed to load project form file : ${err}") } // TEMP & TODO
+	win.project.load_from_file("${get_appdata_path()}/projects/temp.json") or { log.failed("Failed to load project form file : ${err}") } // TEMP & TODO
 	win.project.update_ui_from_save_file(mut ui)
 	// win.toaster.add_toast("Save file loaded", .info, 2.0) // TODO : Move the loading to seperate function and buffer toasts until first redraw
 	
 	// UNSAFE !!!!
-	win.note_editor.init_tools()
+	win.note_editor.init_tools(mut win.project)
 	win.note_editor.open_pattern(win.project.patterns[0] or { unsafe { nil } })
 	ui.hooks["open-pattern"] = fn [mut win] (pattern_ptr voidptr) { win.note_editor.open_pattern(pattern_ptr) }
 	
 	// Call initialization hook for user button
 	ui.call_hook("on-username-change", win.project.user_name.str) or {  }
-	
-	/*
-	for note in win.note_editor.notes {
-		win.note_editor.note_colors[note] = Color.hex("#ff8383")
-	}
-	*/
 	
 	// Init footer
 	lj_version := @VMOD_FILE.find_between("version: '", "'")
@@ -212,13 +192,28 @@ pub fn (mut win Window) init(mut ui UI) {
 		win.toaster.add_toast(msg, .info, 2.0)
 	}
 	
-	
-	// ui.popups << NewSessionPopup.new(ui, ui.top_left() + Vec2{80, 80}, ui.bottom_right() - Vec2{160, 160}, mut win.project)
+	// Connect Net hooks
+	win.project.on_net_pattern_created << ui.hooks["add-to-pattern-list"]
+	win.project.on_net_note_created << fn [mut win] (note &Note) {
+		win.note_editor.notes << &NoteUI{
+			note: note
+			is_colored: win.note_editor.colors[win.note_editor.selected_color] == note.color
+		}
+		println("New Note added through network!")
+	}
+	win.project.on_net_note_deleted << fn [mut win] (note &Note) {
+		for i, note_ui in win.note_editor.notes {
+			if note_ui.note == note {
+				win.note_editor.notes.delete(i)
+				break
+			}
+		}
+	}
 	
 	// Test-Init Timeline
 	win.timeline.reload(ui, win.project) or {
 		win.toaster.add_toast("Failed to reload timeline", .error, 2.0)
-		log.error("Failed to reload timeline")
+		log.failed("Failed to reload timeline")
 	}
 }
 

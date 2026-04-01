@@ -1,6 +1,6 @@
 module mirrorlib
 
-import log
+import std.log { Log }
 import net
 import time
 // import net.http
@@ -21,6 +21,7 @@ pub struct Conn {
 	is_connected             bool
 	// server_ip                string
 	
+	log                      &Log
 	tcp                      &net.TcpConn
 	
 	// Hooks
@@ -43,7 +44,7 @@ pub struct Conn {
 }
 
 // Returns a new connection instance (not active)
-pub fn Conn.new(target_ip string, is_host bool) !&Conn {
+pub fn Conn.new(target_ip string, is_host bool, mut logger Log) !&Conn {
 	server_ip := (if target_ip.contains(":") { target_ip.all_before(":") } else { target_ip }) + ":${server_port}"
 	
 	// Connect to server
@@ -52,6 +53,7 @@ pub fn Conn.new(target_ip string, is_host bool) !&Conn {
 		is_connected: false
 		tcp: tcp
 		is_host: is_host
+		log: logger
 	}
 	go conn.update_routine()
 	
@@ -91,7 +93,8 @@ pub fn (mut conn Conn) send_packet(packet Packet) ! {
 	}
 	
 	conn.tcp.write(packet.to_byte_arr()) or { return error("Failed to write packet to tcp connection") }
-	println("Packet sent : ${packet}")
+	// conn.log.debug("Packet sent : ${packet}")
+	conn.log.tcp_out(packet)
 }
 
 // Updates packet receiving and calls the on_packet function, if a packet is received
@@ -110,13 +113,13 @@ pub fn (mut conn Conn) package() {
 			}
 			
 			raw_packet_action := pop_left_many(mut conn.backlog, 4) or {
-				log.error("Failed to properly parse connection backlog to read next packet action!")
+				log.failed("Failed to properly parse connection backlog to read next packet action!")
 				break
 			}
 			packet_action := big_endian_u32(raw_packet_action)
 			
 			data := pop_left_many(mut conn.backlog, int(packet_len) - 8) or {
-				log.error("Failed to properly parse connection backlog to read packet data!")
+				log.failed("Failed to properly parse connection backlog to read packet data!")
 				break
 			}
 			
@@ -143,7 +146,7 @@ pub fn (mut conn Conn) update_routine() ! {
 		mut buf := []u8{len: max_tcp_bytes_read}
 		new_bytes := conn.tcp.read(mut buf) or {
 			// return error("Failed to read data from TCP Connection : ${err}")
-			// log.error("Failed to read data from TCP Connection : ${err}")
+			// log.failed("Failed to read data from TCP Connection : ${err}")
 			continue
 		}
 		
@@ -158,7 +161,8 @@ pub fn (mut conn Conn) update_routine() ! {
 
 // Internal reaction-function to new packets
 fn (mut conn Conn) react_to_packet(packet Packet) {
-	println("New packet : ${packet}")
+	// conn.log.debug("New packet : ${packet}")
+	conn.log.tcp_in(packet)
 	
 	// > Call base hook for all packets
 	if conn.on_packet != none {
@@ -211,7 +215,7 @@ fn (mut conn Conn) on_packet_internal(packet Packet) {
 }
 
 // Freezes frame until a packet with the given action is received, which is then returned, or the request times out after ```timeout``` seconds
-pub fn (mut conn Conn) wait_for_packet(action u32, timeout f64) !Packet {
+pub fn (mut conn Conn) await_packet_by_action(action u32, timeout f64) !Packet {
 	// > Create stop watch for timeout
 	sw := time.new_stopwatch()
 	conn.last_packet = Packet.empty(0)
