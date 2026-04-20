@@ -2,6 +2,55 @@ module appui
 
 import gg
 
+import app { Project }
+import std.log
+import std.geom2 { Vec2 }
+import uilib { UI, Tree }
+
+@[heap]
+pub struct Browser {
+	pub mut:
+	from            Vec2
+	size            Vec2
+	
+	scroll          f64
+	tree            Tree
+	
+	project         &Project                     = unsafe { nil }
+	
+	on_select       ?fn (path string)
+}
+
+pub fn (mut browser Browser) init(mut ui UI, mut project &Project, parent_path string, exclude []string, exclude_top_folder bool) {
+	browser.project = project
+	browser.tree = Tree.from_file_system(parent_path, exclude, exclude_top_folder)
+	browser.tree.on_select = fn [mut browser, mut ui] (_ string, os_path string) {
+		mut instrument := browser.project.new_instrument_from_dl_path(os_path) or {
+			browser.project.log.failed("Failed to create Insturment instance : ${err}")
+			return
+		}
+		ui.call_hook("add-to-instrument-list", instrument) or {
+			log.failed("Failed to call hook to add an instrument to the rack of insturments : ${err}")
+		}
+		// TODO : Create new instrument and place it in Rack with UI-hook update
+	}
+}
+
+pub fn (mut browser Browser) draw(mut ui UI) {
+	browser.tree.from = browser.from
+	browser.tree.size = browser.size
+	browser.tree.draw(mut ui)
+}
+
+pub fn (mut browser Browser) event(mut ui UI, event &gg.Event) ! {
+	browser.tree.event(mut ui, event)!
+}
+
+
+
+/*
+import gg
+
 import std.geom2 { Vec2 }
 import std { Color }
 import uilib { UI, Button, FooterHook }
@@ -45,9 +94,9 @@ pub struct BrowserGroup {
 	pub mut:
 	title         string
 	color         Color
-	is_unfolded   bool                  = true
 	elements      []BrowserElement
 	button        Button
+	is_unfolded   bool                  = true
 }
 
 pub fn BrowserGroup.new(title string, color Color, elements []BrowserElement) &BrowserGroup {
@@ -141,3 +190,5 @@ pub fn (mut browser Browser) event(mut ui UI, event &gg.Event) ! {
 		}
 	}
 }
+
+*/

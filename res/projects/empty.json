@@ -1,0 +1,17 @@
+{
+    "project": {
+        "name": "Empty Project",
+        "lmnj-version": "0.0.0",
+        "sample-rate": 44100,
+        "channels": 2
+    },
+    "patterns": [],
+    "instruments": [],
+    "tracks": [
+        {
+            "title": "Empty Track",
+            "type": "pattern",
+            "elements": []
+        }
+    ]
+}

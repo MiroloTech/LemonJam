@@ -1,0 +1,7 @@
+{
+    "type": "Instrument",
+    "name": "Aurora",
+    "creator": "Mirolo",
+    "description": "Aurora is a small testing synth instrument with the most basic level of controls.",
+    "file": "aurora.dll"
+}

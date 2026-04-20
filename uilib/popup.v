@@ -4,6 +4,7 @@ import gg
 
 import std.geom2 { Vec2 }
 
+@[heap]
 pub interface Popup {
 	mut:
 	from     Vec2

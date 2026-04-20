@@ -17,6 +17,8 @@ pub struct NoteEditor {
 	from                         Vec2
 	size                         Vec2
 	
+	project                      &Project         = unsafe { nil }
+	
 	scroll_x                     f64
 	scroll_y                     f64
 	pixels_per_beat              f64              = 60.0
@@ -35,6 +37,7 @@ pub struct NoteEditor {
 	
 	notes                        []&NoteUI       = []
 	
+	playing                      bool
 	playhead_pos                 f64
 	hovering_playhead            bool
 	dragging_playhead            bool
@@ -49,7 +52,7 @@ pub struct NoteEditor {
 		ToolPlaceNotes{},
 		ToolDeleteNotes{}
 	]
-	selected_tool                int //              = 1
+	selected_tool                int
 	
 	pub:
 	note_inside_drag_dist        f64              = 4.0
@@ -115,9 +118,6 @@ pub fn (mut editor NoteEditor) event(mut ui UI, event &gg.Event) ! {
 		editor.update_tool_colors()
 		return uilib.surpress_event()
 	}
-	
-	// Control note-specific events
-	// editor.control_notes(mut ui, event)!
 	
 	// Move piano preview around
 	if is_inside_window && event.typ == .mouse_scroll {
@@ -360,9 +360,18 @@ pub fn (mut editor NoteEditor) draw_tools(mut ui UI) {
 		family: ui.style.font_regular
 	)
 	
+	// Draw play buttons
+	bar_center := Vec2{editor.from.x + editor.size.x * 0.5, editor.from.y}
+	ui.draw_icon(
+		if editor.playing { "tool-pause" } else { "tool-play" },
+		bar_center - Vec2{icon_size * 0.5, -2.0},
+		Vec2.v(icon_size),
+		ui.style.color_text
+	)
+	
 	// Draw list of tools
 	mut tool_position := editor.from + Vec2.v(ui.style.padding)
-	tool_size := Vec2.v(editor.header_height * 0.5 - ui.style.padding * 2.0)
+	tool_size := Vec2.v(icon_size)
 	tool_icon_padding := 2.0
 	for i, mut tool in editor.tools {
 		// > Draw tool icon
@@ -516,7 +525,20 @@ pub fn (mut editor NoteEditor) control_playhead(mut ui UI, event &gg.Event) ! {
 	// > Move playhead
 	if editor.dragging_playhead {
 		editor.playhead_pos += f64(event.mouse_dx) / editor.pixels_per_beat
+		// TODO : Snap to beats
 		if editor.playhead_pos < 0.0 { editor.playhead_pos = 0.0 }
+		
+		// >> Seeking
+		if event.typ == .mouse_move && !isnil(editor.pattern) {
+			editor.project.play_preview_pcm_frames(
+				editor.project.get_pattern_pcm_frames(
+					editor.pattern,
+					editor.playhead_pos,
+					u32(1.0 / 5.0 * f64(editor.project.sample_rate))
+				)
+			)
+		}
+		
 		return uilib.surpress_event()
 	}
 	
@@ -583,7 +605,10 @@ pub fn (mut editor NoteEditor) open_pattern(pattern &Pattern) {
 }
 
 pub fn (mut editor NoteEditor) init_tools(mut project &Project) {
+	editor.project = project
+	
 	for mut tool in editor.tools {
+		tool.project = project
 		tool.grid_world_conv.world_to_grid = fn [mut editor] (pos Vec2) (f64, int) {
 			rect := Rect2{editor.from + Vec2{editor.piano_width, editor.header_height}, editor.from + editor.size - Vec2{editor.piano_width, editor.header_height}}
 			mut fromx := (pos.x - editor.from.x - editor.piano_width + editor.scroll_x) / editor.pixels_per_beat
@@ -628,7 +653,6 @@ pub fn (mut editor NoteEditor) init_tools(mut project &Project) {
 			editor.pattern.instruments.delete(note_ui.note)
 			*/
 		}
-		tool.project = project
 	}
 	editor.update_tool_colors()
 }

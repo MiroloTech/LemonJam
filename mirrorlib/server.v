@@ -28,8 +28,8 @@ pub struct Server {
 
 pub fn (mut server Server) refresh_ping() {
 	if server.status != .live { return }
-	result := os.execute("ping -i 20 ${server.ip}")
-	if result.output.contains("Average = ") {
+	result := os.execute("ping ${server.ip}")
+	if result.output.contains("Average = ") { // TODO : Make this better to suit non-englisch PCs too
 		server.ping = result.output.find_between("Average = ", "ms").f64()
 	} else {
 		log.failed("Ping to ${server.ip} server '${server.title}' failed : ${result.output}")
@@ -72,6 +72,7 @@ fn Server.load_list_from_json(data string) ![]Server {
 pub fn Server.fetch_server_list() ![]Server {
 	// TODO : Maybe implement caching for this list
 	// TODO : Internet logic here
+	println(os.args)
 	temp := '{
     "ts": {
         "title": "Test",
@@ -83,7 +84,7 @@ pub fn Server.fetch_server_list() ![]Server {
     "de": {
         "title": "Germany",
         "status": "live",
-        "ip": "216.58.206.46",
+        "ip": "${os.args[1] or { "127.0.0.1" }}",
         "lon": 9.1,
         "lat": 48.8
     },

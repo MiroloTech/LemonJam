@@ -7,9 +7,9 @@ import std.log { Log }
 import std.geom2 { Vec2 }
 import std.project { get_appdata_path }
 import app { Project }
-import audio.objs { Pattern, Note }
+import audio.objs { Pattern, Instrument, Note }
 import uilib { UI, Toaster, HSplit, VSplit, NoteUI }
-import appui.popups { NewPatternPopup, NewSessionPopup, JoinSessionPopup, LoggerPopup }
+import appui.popups { NewPatternPopup, NewSessionPopup, JoinSessionPopup, LoggerPopup, InstrumentPopup }
 
 pub struct Window {
 	pub mut:
@@ -38,7 +38,7 @@ pub fn (mut win Window) init(mut ui UI) {
 	// Init project
 	win.project = &Project{}
 	win.project.log = &Log{}
-	win.project.ui_ptr = &ui
+	win.project.ui = ui
 	
 	// Init header
 	win.header.project = mut win.project
@@ -101,20 +101,32 @@ pub fn (mut win Window) init(mut ui UI) {
 	win.main_vsplit.splits = [500.0]
 	
 	// Init browser
+	/*
 	win.browser.groups = [
-		BrowserGroup.new("Instrument", ui.style.color_instrument, [
-			BrowserElement.new("Drum Kit", "It's a Drum Kit", "")
-			BrowserElement.new("Flute", "It's a Flute", "")
-			BrowserElement.new("Electric Keys", "It's an Electric Keyboard", "")
-		]),
+		// TODO : Implement path criteria, from which all elements are infered as the names of every file / folder in the thing
+		// > Additionally, each group gets its own on_select hook, whch opens up the path to the element, that has been clicked
+		// > Remove elements array to force auto-loading
+		BrowserGroup.new(
+			"Instrument",
+			ui.style.color_instrument,
+			os.join_path(get_appdata_path(), "instruments"),
+			fn [mut win] (path string) {
+				
+			}
+		),
+		/*
 		BrowserGroup.new("Effects", ui.style.color_effect, [
 			BrowserElement.new("Bit Crush", "", "")
 			BrowserElement.new("Radio Cracks", "", "")
 		])
+		*/
 	]
+	*/
+	win.browser.init(mut ui, mut win.project, get_appdata_path(), ["icons/", "fonts/", "projects/", "*.log", "*.md", "*.json"], true)
 	
 	// Init rack
 	mut pattern_rack := RackResource.new(mut ui, "Pattern", ui.style.color_pattern, "tab-pattern", [], none)
+	mut instrument_rack := RackResource.new(mut ui, "Instruments", ui.style.color_instrument, "tab-instrument", [], none)
 	
 	// > Attach popup call
 	pattern_rack.set_on_btn_press_fn(mut ui, fn [mut pattern_rack, mut win] (user_data voidptr) {
@@ -141,17 +153,26 @@ pub fn (mut win Window) init(mut ui UI) {
 		pattern_rack.elements << element
 	}
 	
+	
+	
+	ui.hooks["add-to-instrument-list"] = fn [mut win, mut instrument_rack, mut ui] (instrument_ptr voidptr) {
+		mut instrument := unsafe { &Instrument(instrument_ptr) }
+		mut element := RackElement.new(instrument.name,  ui.style.color_instrument)
+		element.connect_hook(fn [mut ui] (instrument_ptr voidptr) {
+			// Call hook
+			ui.call_hook("open-instrument", instrument_ptr) or { return }
+		}, instrument)
+		instrument_rack.elements << element
+	}
+	
+	// TODO : Connect hook open-insturment to popup, which displays the instrument`
+	
 	// TODO : Now display project instruments, effects and sounds in Rack
 	// TODO : Properly implement racks with hooks on re-creation of pattern
 	
 	win.rack.tabs = [
 		pattern_rack,
-		
-		RackResource.new(mut ui, "Instruments",  ui.style.color_instrument,     "tab-instrument",  [
-			RackElement.new("Electric Keys",  ui.style.color_instrument),
-			RackElement.new("Drum Kit",       ui.style.color_instrument),
-		], none)
-		
+		instrument_rack,
 		RackResource.new(mut ui, "Effects",      ui.style.color_effect,         "tab-effect",      [
 			RackElement.new("Radio Cracks",   ui.style.color_effect),
 		], none)
@@ -165,13 +186,13 @@ pub fn (mut win Window) init(mut ui UI) {
 		}) // > Connect hook to create new sound
 	]
 	
-	win.project.load_from_file("${get_appdata_path()}/projects/temp.json") or { log.failed("Failed to load project form file : ${err}") } // TEMP & TODO
+	win.project.load_from_file("${get_appdata_path()}/projects/empty.json") or { log.failed("Failed to load project form file : ${err}") } // TEMP & TODO
 	win.project.update_ui_from_save_file(mut ui)
 	// win.toaster.add_toast("Save file loaded", .info, 2.0) // TODO : Move the loading to seperate function and buffer toasts until first redraw
 	
 	// UNSAFE !!!!
 	win.note_editor.init_tools(mut win.project)
-	win.note_editor.open_pattern(win.project.patterns[0] or { unsafe { nil } })
+	// win.note_editor.open_pattern(win.project.patterns[0] or { unsafe { nil } })
 	ui.hooks["open-pattern"] = fn [mut win] (pattern_ptr voidptr) { win.note_editor.open_pattern(pattern_ptr) }
 	
 	// Call initialization hook for user button
@@ -214,6 +235,13 @@ pub fn (mut win Window) init(mut ui UI) {
 	win.timeline.reload(ui, win.project) or {
 		win.toaster.add_toast("Failed to reload timeline", .error, 2.0)
 		log.failed("Failed to reload timeline")
+	}
+	
+	// Connect open-instrument hook
+	ui.hooks["open-instrument"] = fn [mut ui] (instrument_ptr voidptr) {
+		mut instrument := unsafe { &Instrument(instrument_ptr) }
+		// Opens a popup, which renders and manages input with the instrument
+		ui.popups << InstrumentPopup.new(ui.center() - Vec2{800, 450}, Vec2{1600, 900}, mut instrument)
 	}
 }
 
@@ -302,6 +330,6 @@ pub fn (mut win Window) event(mut ui UI, event &gg.Event) {
 }
 
 pub fn (mut win Window) cleanup(mut ui UI) {
-	
+	win.project.cleanup()
 }
 

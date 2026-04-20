@@ -21,8 +21,8 @@ pub struct Conn {
 	is_connected             bool
 	// server_ip                string
 	
-	log                      &Log
-	tcp                      &net.TcpConn
+	log                      &Log               = unsafe { nil }
+	tcp                      &net.TcpConn       = unsafe { nil }
 	
 	// Hooks
 	on_packet                ?fn (packet Packet)

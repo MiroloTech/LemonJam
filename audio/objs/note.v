@@ -57,5 +57,14 @@ pub fn Note.from_data_tag(data_tag string, nid &NID) Note {
 	}
 }
 
-
-
+// Dereferences every note and removes the nid
+pub fn (arr []&Note) simplify() []Note {
+	mut notes := []Note{}
+	for note in arr {
+		notes << Note{
+			...*note
+			nid: unsafe { nil }
+		}
+	}
+	return notes
+}

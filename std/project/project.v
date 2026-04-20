@@ -6,6 +6,8 @@ import compress.szip
 
 const resource_zip := $embed_file("res.zip")
 
+const include_res_paths := ["icons", "fonts"]
+
 // Returns the path to the AppData folder, which contains resources, that can't be embeded properly here. This folder should be created by an installer. This panics, if the folder doesn't exist.
 pub fn get_appdata_path() string {
 	app_data := os.config_dir() or { panic("Failed to fetch AppData folder : ${err}") }
@@ -36,7 +38,7 @@ pub fn extract_appdata() {
 	os.create(temp_path) or { panic("Failed to create temp res file at dir ${temp_path} : ${err}") }
 	os.write_file(temp_path, resource_zip.to_string()) or { panic("Failed to write to temp res file : ${err}") }
 	
-	// Extract fodler
+	// Extract folder
 	// TODO : Check, if this extraction overwrites anything
 	make_appdata_folder()
 	success := szip.extract_zip_to_dir(temp_path, get_appdata_path()) or {
@@ -54,12 +56,19 @@ pub fn extract_appdata() {
 		target_path := os.join_path(get_appdata_path(), entry)
 		sub_entries := os.ls(path) or { [] }
 		
+		// >> Only update files in specific folders
+		if !(entry in include_res_paths) {
+			continue
+		}
+		
 		// >> Create top-level dir
-		os.mkdir(target_path) or {  }
+		os.mkdir(target_path) or { }
 		
 		// >> Move every sub-element to top-level folder
 		for sub_entry in sub_entries {
 			sub_path := os.join_path(path, sub_entry)
+			// TODO : Don't move .dll file with zip to unpack (it's too big).
+			// println(" - " + sub_path)
 			/*
 			// This only places new resources in the folders, while leaving old and modified ones untouched
 			if !os.exists(os.join_path(target_path, sub_entry)) {
@@ -68,11 +77,13 @@ pub fn extract_appdata() {
 			*/
 			
 			// This may overwrite existing modifications, which is often intended
-			if os.exists(os.join_path(target_path, sub_entry)) {
-				os.rm(os.join_path(target_path, sub_entry)) or {  }
+			final_path := os.join_path(target_path, sub_entry)
+			if os.exists(final_path) {
+				os.rm(final_path) or {  }
 			}
 			os.mv(sub_path, target_path) or { continue }
 		}
+		
 	}
 	
 	// >> Remove old res folder

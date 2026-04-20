@@ -27,7 +27,7 @@ pub fn (mut tool ToolPlaceNotes) event(mut ui UI, event &gg.Event) {
 	if event.typ == .mouse_down && event.mouse_button == .left {
 		if tool.dragging == unsafe { nil } {
 			// Make new note instance here
-			mut note := tool.project.new_note_simple(tool.preview_time, 0.0, tool.preview_id, tool.current_color, mut tool.pattern, unsafe { nil })
+			mut note := tool.project.new_note_simple(tool.preview_time, 0.0, tool.preview_id, tool.current_color, mut tool.pattern, tool.project.get_active_instrument())
 			
 			mut note_ui := &NoteUI{
 				note: note

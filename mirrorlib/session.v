@@ -26,7 +26,7 @@ pub struct Session {
 	session_code              string
 	status                    SessionStatus        = .pending
 	conn                      &Conn                = unsafe { nil }
-	log                       &Log
+	log                       &Log                 = unsafe { nil }
 	
 	on_ready                  ?fn ()
 	can_update                bool                 = true
