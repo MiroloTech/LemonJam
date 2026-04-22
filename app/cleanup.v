@@ -5,4 +5,8 @@ pub fn (mut project Project) cleanup() {
 	for mut instrument in project.instruments {
 		instrument.cleanup()
 	}
+	
+	if project.playback.device != unsafe { nil } {
+		project.playback.device.cleanup()
+	}
 }

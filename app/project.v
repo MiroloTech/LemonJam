@@ -15,6 +15,7 @@ pub struct Project {
 	
 	sample_rate                 u32                     = 44100
 	channels                    u32                     = 1
+	bpm                         f64                     = 120.0
 	
 	instruments                 []&Instrument
 	effects                     []&Effect
@@ -33,6 +34,10 @@ pub struct Project {
 	on_net_note_created         []fn (pattern &Note)
 	on_net_note_updated         []fn (pattern &Note)
 	on_net_note_deleted         []fn (pattern &Note)
+	
+	// Playback
+	playback                    Playback                = Playback{}
+	// TODO : Add playback mask
 }
 
 

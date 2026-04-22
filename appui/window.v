@@ -39,6 +39,9 @@ pub fn (mut win Window) init(mut ui UI) {
 	win.project = &Project{}
 	win.project.log = &Log{}
 	win.project.ui = ui
+	win.project.ready_playback() or {
+		log.failed("Failed to create playback device : ${err}")
+	}
 	
 	// Init header
 	win.header.project = mut win.project

@@ -12,7 +12,7 @@ import mirrorlib { NID, Packet }
 type FNInstrumentLoad = fn (contexts map[string]voidptr) voidptr
 type FNInstrumentDraw = fn (ptr voidptr, window_from Vec2, window_size Vec2)
 type FNInstrumentEvent = fn (ptr voidptr, event &gg.Event)
-type FNInstrumentPCMFrame = fn (ptr voidptr, notes []Note, time f64, frame_count u32) []f64 
+type FNInstrumentPCMFrame = fn (ptr voidptr, notes []Note, time f64, frame_count u32, sample_rate u32, channels u32, bpm f64) []f64 
 
 @[heap]
 pub struct Instrument {
@@ -124,15 +124,15 @@ pub fn (mut instrument Instrument) event(event &gg.Event) {
 	instrument.fn_event(instrument.system, event)
 }
 
-pub fn (mut instrument Instrument) read_pcm_frames(notes []&Note, time f64, frame_count u32) []f64 {
-	frames := instrument.fn_pcm_frames(instrument.system, notes.simplify(), time, frame_count)
+pub fn (mut instrument Instrument) read_pcm_frames(notes []&Note, time f64, frame_count u32, sample_rate u32, channels u32, bpm f64) []f64 {
+	frames := instrument.fn_pcm_frames(instrument.system, notes.simplify(), time, frame_count, sample_rate, channels, bpm)
 	return frames
 }
 
 
 pub fn (mut instrument Instrument) cleanup() {
 	if instrument.dl_handle != unsafe { nil } {
-		// dl.close(instrument.dl_handle)
+		// dl.close(instrument.dl_handle) // IDK why, but this crashes the app a lot of the times...
 		instrument.dl_handle = unsafe { nil }
 	}
 }

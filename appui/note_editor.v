@@ -99,6 +99,12 @@ pub fn (mut editor NoteEditor) event(mut ui UI, event &gg.Event) ! {
 	mpos := Vec2{event.mouse_x, event.mouse_y}
 	is_inside_window := Rect2.from_size(editor.from, editor.size).is_point_inside(mpos)
 	
+	// TEST!
+	if event.typ == .key_down && event.key_code == .space {
+		editor.project.set_playback_target_pattern(editor.pattern)
+		editor.project.seek_playback(editor.playhead_pos, true)
+	}
+	
 	// Control headbar events
 	editor.control_playhead(mut ui, event)!
 	editor.control_tool_bar(mut ui, event)!
@@ -530,6 +536,7 @@ pub fn (mut editor NoteEditor) control_playhead(mut ui UI, event &gg.Event) ! {
 		
 		// >> Seeking
 		if event.typ == .mouse_move && !isnil(editor.pattern) {
+			/*
 			editor.project.play_preview_pcm_frames(
 				editor.project.get_pattern_pcm_frames(
 					editor.pattern,
@@ -537,6 +544,10 @@ pub fn (mut editor NoteEditor) control_playhead(mut ui UI, event &gg.Event) ! {
 					u32(1.0 / 5.0 * f64(editor.project.sample_rate))
 				)
 			)
+			*/
+			// TODO : Add playback mask here
+			editor.project.set_playback_target_pattern(editor.pattern)
+			editor.project.seek_playback(editor.playhead_pos, true)
 		}
 		
 		return uilib.surpress_event()

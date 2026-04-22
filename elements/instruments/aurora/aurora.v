@@ -1,7 +1,6 @@
 import gg
 
 import app.context { DlRenderContext }
-import math { sin }
 import std { Color }
 import std.geom2 { Vec2, Rect2 }
 import audio
@@ -25,7 +24,7 @@ pub struct Aurora {
 	size                  Vec2
 	
 	// Instrument
-	last_pcm_time         f64                         = -1.0
+	last_pcm_beat         f64                         = -1.0
 	playing_notes         []Note                      = []Note{}
 	preview_time          f64                         = 0.05
 	preview_sample_rate   u32                         = 4000
@@ -90,7 +89,8 @@ pub fn draw(ptr voidptr, window_from Vec2, window_size Vec2) {
 			
 			// > Add samples to list of frames
 			t := f64(x) / f64(aurora.preview_sample_rate)
-			s += sin(t * freq * math.tau) * amp
+			// s += sin(math.tau / (t * freq)) * amp
+			s += audio.simple_wave_sin(t, freq, amp)
 		}
 		samples[x] = s
 	}
@@ -133,16 +133,19 @@ pub fn event(ptr voidptr, event &gg.Event) {
 
 
 // ===== AUDIO =====
+// TODO : Fully rename time to beat to avoid confusion
 
 @[export: 'pcm_frames']
-pub fn pcm_frames(ptr voidptr, notes []Note, time f64, frame_count u32) []f64 { // TODO : Add sample_rate and channels here
+pub fn pcm_frames(ptr voidptr, notes []Note, beat f64, frame_count u32, sample_rate u32, channels u32, bpm f64) []f64 {
 	mut aurora := unsafe { &Aurora(ptr) }
+	inv_sample_rate := 1.0 / f64(sample_rate)
 	
 	// Create empty frame array
-	mut frames := []f64{len: int(frame_count), init: 0.0}
-	if time != aurora.last_pcm_time {
+	if beat != aurora.last_pcm_beat { // > Allow for note stacking, when pcm_frames function is called two times with the same time
 		aurora.playing_notes = []
 	}
+	time := beat / bpm * 60.0
+	mut frames := []f64{len: int(frame_count), init: 0.0}
 	
 	// Get all effected notes
 	for note in notes {
@@ -151,16 +154,18 @@ pub fn pcm_frames(ptr voidptr, notes []Note, time f64, frame_count u32) []f64 { 
 			aurora.playing_notes << note
 			
 			freq := audio.note2freq(f64(note.id))
-			amp := note.volume
+			amp := note.volume * 0.25
 			
 			// > Add samples to list of frames
-			for mut frame in frames {
-				t := time + f64(frame) / f64(aurora.sample_rate)
-				frame += sin(t * freq * math.tau) * amp
+			for i in 0..frames.len {
+				t := time + f64(i) * inv_sample_rate
+				// print("(${(t*1000):.8},")
+				frames[i] += audio.simple_wave_sin(t, freq, amp)
+				// print("${frame:.3}), ")
 			}
 		}
 	}
-	aurora.last_pcm_time = time
+	aurora.last_pcm_beat = beat
 	
 	// Return sample collection
 	return frames
