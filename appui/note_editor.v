@@ -35,7 +35,7 @@ pub struct NoteEditor {
 	selected_color               int
 	hovering_color               int              = -1
 	
-	notes                        []&NoteUI       = []
+	notes                        []&NoteUI        = []
 	
 	playing                      bool
 	playhead_pos                 f64

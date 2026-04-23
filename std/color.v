@@ -339,6 +339,11 @@ pub fn (c Color) luminance() f64 {
 	return r_lin * 0.2126 + g_lin * 0.7152 + b_lin * 0.0722
 }
 
+// x.json2 - specific function to allow for easy parsing from a json using x.json2
+pub fn (mut c Color) from_json_string(raw_string string) ! {
+	c = Color.hex(raw_string)
+}
+
 
 // --- Integrated modifiers / methods ---
 

@@ -79,7 +79,7 @@ pub fn (mut project Project) set_playback_target_pattern(pattern ?&Pattern) {
 
 // Creates and initializes the main playback device to use when previewing
 pub fn (mut project Project) ready_playback() ! {
-	shared device := &AudioDevice{
+	device := &AudioDevice{
 		wave_callback: fn [mut project] (frame_count u32, sample_rate u32, channels u32) []f64 {
 			// TODO : Fix GC error by MAYBEEEEE locking the project when modifying it's values
 			// (may cause concurrency issues when trying to offset preview_beets in seek_playback while offseting them in this callback fucntion)

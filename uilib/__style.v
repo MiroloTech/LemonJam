@@ -1,5 +1,8 @@
 module uilib
 
+import os
+import x.json2 as json
+
 import std { Color }
 import std.project { get_appdata_path }
 
@@ -70,5 +73,18 @@ pub struct Style {
 	font_italic                string              = "${get_appdata_path()}/fonts/PlayPenSans-Regular.ttf" // TODO : Replace with proper italic font
 	font_bold_italic           string              = "${get_appdata_path()}/fonts/PlayPenSans-Bold.ttf" // TODO : Replace with proper italic-bold font
 	font_mono                  string              = "${get_appdata_path()}/fonts/SourceCodePro-Regular.ttf"
+}
+
+pub fn Style.load_from_json(path string) !Style {
+	src := os.read_file(path) or { return error("Failed to open file at given path '${path}' : ${err}") }
+	mut style := json.decode[Style](src) or { return error("Failed to parse json data from style .json file at '${path}' : ${err}") }
+	// println(style)
+	style.font_regular        = "${get_appdata_path()}/fonts/${style.font_regular}"
+	style.font_bold           = "${get_appdata_path()}/fonts/${style.font_bold}"
+	style.font_italic         = "${get_appdata_path()}/fonts/${style.font_italic}"
+	style.font_bold_italic    = "${get_appdata_path()}/fonts/${style.font_bold_italic}"
+	style.font_mono           = "${get_appdata_path()}/fonts/${style.font_mono}"
+	
+	return style
 }
 

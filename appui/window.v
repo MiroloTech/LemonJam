@@ -30,6 +30,8 @@ pub struct Window {
 }
 
 pub fn (mut win Window) init(mut ui UI) {
+	// ui.load_style("${get_appdata_path()}/themes/fancy_three.json")
+	
 	// Init toaster
 	win.toaster = Toaster{}
 	win.toaster.from = Vec2{400 - 40, 1000 - 40}

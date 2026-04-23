@@ -212,6 +212,13 @@ pub fn (mut ui UI) call_hook(tag string, data voidptr) ! {
 	// log.info("Hook called : ${tag}")
 }
 
+pub fn (mut ui UI) load_style(path string) {
+	ui.style = Style.load_from_json(path) or {
+		log.failed("Failed to load style : ${err}")
+		Style{}
+	}
+}
+
 
 pub fn event_to_action_code(event &gg.Event) string {
 	if event.typ == .key_down {

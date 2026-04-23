@@ -1,0 +1,56 @@
+{
+	"color_bg":                "#2b303a",
+	"color_grey":              "#47525f",
+	"color_text":              "#bac1b8",
+	"color_panel":             "#39414d",
+	"color_contrast":          "#47525f",
+	
+	"color_error":             "#d64933",
+	"color_correct":           "#0c7c59",
+	"color_warning":           "#c9bd4c",
+	"color_info":              "#58a4b0",
+	
+	"color_primary_bright":    "#bac1b8",
+	"color_primary":           "#a0a8a4",
+	"color_primary_dark":      "#8c9595",
+	
+	"color_instrument":        "#0c7c59",
+	"color_pattern":           "#58a4b0",
+	"color_effect":            "#c29ac9",
+	"color_sound":             "#ce8c2c",
+	
+	"color_note_white":        "#bac1b8",
+	"color_note_black":        "#2b303a",
+	
+	"color_log_txt":           "#a0a8a4",
+	"color_log_info":          "#58a4b0",
+	"color_log_error":         "#d64933",
+	"color_log_http":          "#ce8c2c",
+	"color_log_tcp":           "#0c7c59",
+	"color_log_udp":           "#a26fc1",
+	
+	"colors_users":            ["#d64933", "#ce8c2c", "#c9bd4c", "#0c7c59", "#58a4b0", "#c29ac9", "#a26fc1", "#47525f"],
+	
+	"padding":                 4.0,
+	"strong_padding":          12.0,
+	"list_gap":                4.0,
+	"line_spacing":            8.0,
+	"seperator_height":        10.0,
+	"margin":                  6.0,
+	"rounding":                4.0,
+	"outline_size":            2.0,
+	"font_size":               18,
+	"font_size_title":         21,
+	"rect_stripe_spacing":     8.0,
+	"scroll_speed":            12.0,
+	"pan_speed":               1.0,
+	
+	"scroll_step_v":           40.0,
+	"scroll_step_h":           40.0,
+	
+	"font_regular":            "Figtree-Regular.ttf",
+	"font_bold":               "Figtree-Bold.ttf",
+	"font_italic":             "Figtree-Italic.ttf",
+	"font_bold_italic":        "Figtree-BoldItalic.ttg",
+	"font_mono":               "SourceCodePro-Regular.ttf"
+}

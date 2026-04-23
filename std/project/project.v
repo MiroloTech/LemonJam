@@ -7,6 +7,7 @@ import compress.szip
 const resource_zip := $embed_file("res.zip")
 
 const include_res_paths := ["icons", "fonts"]
+const force_create_folder := ["projects", "themes"]
 
 // Returns the path to the AppData folder, which contains resources, that can't be embeded properly here. This folder should be created by an installer. This panics, if the folder doesn't exist.
 pub fn get_appdata_path() string {
@@ -56,13 +57,20 @@ pub fn extract_appdata() {
 		target_path := os.join_path(get_appdata_path(), entry)
 		sub_entries := os.ls(path) or { [] }
 		
+		// >> Create folder and auto-fill it's contents from res/ folder, if the folder doesn't already exist
+		if entry in force_create_folder {
+			if !os.is_dir(target_path) {
+				os.mv(path, target_path) or {  }
+			}
+		} 
+		
 		// >> Only update files in specific folders
 		if !(entry in include_res_paths) {
 			continue
 		}
 		
 		// >> Create top-level dir
-		os.mkdir(target_path) or { }
+		os.mkdir(target_path) or {  }
 		
 		// >> Move every sub-element to top-level folder
 		for sub_entry in sub_entries {

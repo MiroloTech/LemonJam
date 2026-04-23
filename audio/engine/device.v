@@ -23,11 +23,13 @@ pub fn (mut device AudioDevice) init() ! {
 	config.playback.format    = device.playback_format
 	config.playback.channels  = device.playback_channels
 	config.sampleRate         = device.playback_sample_rate
-	config.dataCallback       = fn [mut device] (ma_device &ma.Device, output voidptr, _ voidptr, frame_count u32) {
+	config.pUserData          = device
+	config.dataCallback       = fn (ma_device &ma.Device, output voidptr, _ voidptr, frame_count u32) {
+		mut device := unsafe { &AudioDevice(ma_device.pUserData) }
 		// sample_count := u64(device.playback_channels) * u64(device.playback_sample_rate) * u64(frame_count)
 		if device.wave_callback != none {
 			samples := device.wave_callback(frame_count, device.playback_sample_rate, device.playback_channels)
-			// samples := []f64{len: int(frame_count), init: math.sin(f64(index + device.t) / f64(device.playback_sample_rate) * 440.0 * math.tau)} // Simple A-Tone
+			// samples := []f64{len: int(frame_count), init: 0.0}
 			// device.t += f64(frame_count)
 			/*
 			if samples.len > 3 {
