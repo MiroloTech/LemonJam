@@ -30,7 +30,6 @@ pub fn NoteUI.from_pattern(pattern &Pattern) []&NoteUI {
 	return note_uis
 }
 
-// TODO : Migrate all NoteUI.color to Note.color
 pub fn NoteUI.from_note(note &Note) &NoteUI {
 	return &NoteUI{
 		note: note

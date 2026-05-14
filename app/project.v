@@ -1,6 +1,6 @@
 module app
 
-import audio.objs { Instrument, Pattern, Effect, Note, Track, TrackType }
+import audio.objs { Instrument, Pattern, Effect, Note, Track }
 import std { Color, ByteStack }
 import mirrorlib { NID, NIDType, Packet, Server, Conn, Session }
 import uilib { UI }
@@ -88,7 +88,7 @@ pub fn (mut project Project) new_instrument_from_save_data(instrument_file strin
 	return unsafe { nil }
 }
 
-pub fn (mut project Project) new_track(title string, typ TrackType) !&Track {
+pub fn (mut project Project) new_track(title string) !&Track {
 	mut track := &Track{
 		title: title
 		nid: unsafe { nil }

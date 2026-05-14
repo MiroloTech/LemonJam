@@ -8,7 +8,7 @@ import app { Project }
 import audio.objs { Note, Pattern }
 import std { Color }
 import std.geom2 { Vec2, Rect2 }
-import uilib { UI, ActionList, Piano, NoteUI }
+import uilib { UI, ActionList, Piano, NoteUI, Playhead }
 import appui.tools.note_editor_tools { NoteEditorToolSkeleton, ToolMoveNotes, ToolCutNotes, ToolSelectNotes, ToolPlaceNotes, ToolDeleteNotes }
 
 @[heap]
@@ -38,9 +38,7 @@ pub struct NoteEditor {
 	notes                        []&NoteUI        = []
 	
 	playing                      bool
-	playhead_pos                 f64
-	hovering_playhead            bool
-	dragging_playhead            bool
+	playhead                     Playhead         = Playhead{}
 	
 	piano                        Piano            = Piano{}
 	piano_width                  f64              = 180.0
@@ -88,8 +86,6 @@ pub fn (mut editor NoteEditor) draw(mut ui UI) {
 		ui.set_cursor(.resize_all)
 	} else if editor.hovering_color != -1 {
 		ui.set_cursor(.pointing_hand)
-	} else if editor.hovering_playhead {
-		ui.set_cursor(.pointing_hand)
 	}
 	
 	ui.pop_scissor()
@@ -102,11 +98,11 @@ pub fn (mut editor NoteEditor) event(mut ui UI, event &gg.Event) ! {
 	// TEST!
 	if event.typ == .key_down && event.key_code == .space {
 		editor.project.set_playback_target_pattern(editor.pattern)
-		editor.project.seek_playback(editor.playhead_pos, true)
+		editor.project.seek_playback(editor.playhead.pos, true)
 	}
 	
 	// Control headbar events
-	editor.control_playhead(mut ui, event)!
+	editor.control_playhead(event)!
 	editor.control_tool_bar(mut ui, event)!
 	
 	// Select Color
@@ -259,49 +255,13 @@ pub fn (editor NoteEditor) draw_bar_lines(mut ui UI) {
 }
 
 
-pub fn (editor NoteEditor) draw_playhead(mut ui UI) {
-	head_size := 8.0
-	base_x := editor.from.x + editor.piano_width
-	header_offset := editor.pixels_per_beat * editor.playhead_pos - editor.scroll_x
-	head_pos := Vec2{base_x, editor.from.y + editor.header_height - head_size} + Vec2{header_offset, 0.0}
-	
-	
-	// Draw line
-	if header_offset > 0.001 {
-		ui.ctx.draw_line(
-			f32(head_pos.x), f32(head_pos.y + head_size),
-			f32(head_pos.x), f32(editor.from.y + editor.size.y),
-			ui.style.color_primary.get_gx()
-		)
-	}
-	
-	// Draw head
-	// > Draw header pointing left
-	if header_offset < 0.0 {
-		ui.ctx.draw_polygon_filled(
-			f32(base_x + head_size), f32(head_pos.y),
-			f32(head_size), 3, f32(180.0),
-			ui.style.color_primary.alpha(0.6).get_gx()
-		)
-	}
-	
-	// > Draw header pointing right
-	else if header_offset > editor.size.x - editor.piano_width {
-		ui.ctx.draw_polygon_filled(
-			f32(base_x + editor.size.x - editor.piano_width - head_size), f32(head_pos.y),
-			f32(head_size), 3, f32(0.0),
-			ui.style.color_primary.alpha(0.6).get_gx()
-		)
-	}
-	
-	// > Draw current header
-	else {
-		ui.ctx.draw_polygon_filled(
-			f32(head_pos.x), f32(head_pos.y),
-			f32(head_size), 3, f32(90.0),
-			ui.style.color_primary.get_gx()
-		)
-	}
+pub fn (mut editor NoteEditor) draw_playhead(mut ui UI) {
+	editor.playhead.scroll_x = editor.scroll_x
+	editor.playhead.px_per_beat = editor.pixels_per_beat
+	playhead_offset := Vec2{editor.piano_width, editor.header_height}
+	editor.playhead.from = editor.from + playhead_offset
+	editor.playhead.size = editor.size - playhead_offset
+	editor.playhead.draw(mut ui)
 }
 
 
@@ -506,36 +466,10 @@ pub fn (mut editor NoteEditor) control_notes(mut ui UI, event &gg.Event) ! {
 */
 
 
-pub fn (mut editor NoteEditor) control_playhead(mut ui UI, event &gg.Event) ! {
-	mpos := Vec2{event.mouse_x, event.mouse_y}
-	head_size := 8.0
-	base_x := editor.from.x + editor.piano_width
-	head_offset := editor.pixels_per_beat * editor.playhead_pos - editor.scroll_x
-	head_pos := Vec2{base_x, editor.from.y + editor.header_height - head_size} + Vec2{head_offset, 0.0}
-	
-	left_playhead := Vec2{base_x + head_size, editor.from.y + editor.header_height - head_size}
-	right_playhead := Vec2{editor.from.x + editor.size.x - head_size, editor.from.y + editor.header_height - head_size}
-	
-	hovering_left_playhead := mpos.distance_to(left_playhead) <= head_size && head_offset < 0.0
-	hovering_right_playhead := mpos.distance_to(right_playhead) <= head_size && head_offset > editor.size.x - editor.piano_width
-	
-	hovering_playhead := mpos.distance_to(head_pos) <= head_size && head_offset >= 0.0
-	
-	editor.hovering_playhead = hovering_playhead || hovering_left_playhead || hovering_right_playhead
-	
-	// > Release playhead
-	if event.typ == .mouse_up {
-		editor.dragging_playhead = false
-	}
-	
-	// > Move playhead
-	if editor.dragging_playhead {
-		editor.playhead_pos += f64(event.mouse_dx) / editor.pixels_per_beat
-		// TODO : Snap to beats
-		if editor.playhead_pos < 0.0 { editor.playhead_pos = 0.0 }
-		
-		// >> Seeking
-		if event.typ == .mouse_move && !isnil(editor.pattern) {
+pub fn (mut editor NoteEditor) control_playhead(event &gg.Event) ! {
+	editor.playhead.event(event)!
+	if editor.playhead.on_drag == none && editor.pattern != unsafe { nil } {
+		editor.playhead.on_drag = fn [mut editor] (t f64) {
 			/*
 			editor.project.play_preview_pcm_frames(
 				editor.project.get_pattern_pcm_frames(
@@ -547,42 +481,7 @@ pub fn (mut editor NoteEditor) control_playhead(mut ui UI, event &gg.Event) ! {
 			*/
 			// TODO : Add playback mask here
 			editor.project.set_playback_target_pattern(editor.pattern)
-			editor.project.seek_playback(editor.playhead_pos, true)
-		}
-		
-		return uilib.surpress_event()
-	}
-	
-	if !editor.hovering_playhead { return }
-	
-	// Move / Jump to header
-	if head_offset < 0.0 {
-		// > Jump to playhead
-		if event.typ == .mouse_down && hovering_left_playhead {
-			editor.scroll_x = editor.pixels_per_beat * editor.playhead_pos - editor.pixels_per_beat * 4.0
-			if editor.scroll_x < 0.0 {
-				editor.scroll_x = 0.0
-			}
-			return uilib.surpress_event()
-		}
-	}
-	
-	else if head_offset > editor.size.x - editor.piano_width {
-		// > Jump to playhead
-		if event.typ == .mouse_down && hovering_right_playhead {
-			editor.scroll_x = editor.pixels_per_beat * editor.playhead_pos - editor.pixels_per_beat * 4.0
-			if editor.scroll_x < 0.0 {
-				editor.scroll_x = 0.0
-			}
-			return uilib.surpress_event()
-		}
-	}
-	
-	else {
-		// > Grab playhead
-		if event.typ == .mouse_down {
-			editor.dragging_playhead = true
-			return uilib.surpress_event()
+			editor.project.seek_playback(t, true)
 		}
 	}
 }

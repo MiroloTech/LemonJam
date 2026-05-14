@@ -4,7 +4,7 @@ import mirrorlib { NID }
 import std { Color }
 
 @[heap]
-pub struct Pattern {
+pub struct Pattern implements TrackObject {
 	pub mut:
 	nid          &NID
 	name         string

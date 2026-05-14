@@ -1,6 +1,6 @@
 module app
 
-import audio.objs { Instrument, Pattern, Effect, Note, Track, TrackType }
+import audio.objs { Instrument, Pattern, Effect, Note, Track }
 import std { Color, ByteStack }
 import std.log { Log }
 
@@ -104,24 +104,30 @@ pub fn (mut project Project) load_from_file(path string) ! {
 	for raw_track_data in tracks {
 		track_data := raw_track_data.as_map()
 		track_title := track_data["title"] or { "unnamed" }.str()
-		track_type_str := track_data["type"] or { return error("No 'track-type' given in track ${track_title}") }.str()
-		track_typ := TrackType.from_str(track_type_str) or { return error("Invalid track type found in track ${track_data} : ${err}") }
+		// track_type_str := track_data["type"] or { return error("No 'track-type' given in track ${track_title}") }.str()
+		// track_typ := TrackType.from_str(track_type_str) or { return error("Invalid track type found in track ${track_data} : ${err}") }
 		
-		mut track := project.new_track(track_title, track_typ) or { return error("Failed to create new track object in project : ${err}") }
-		match track_typ {
-			.pattern {
-				raw_elements := (track_data["elements"] or { break }).as_array()
-				for raw_element in raw_elements {
-					element_data := raw_element.as_map()
-					from := element_data["from"]     or { continue }.f64()
-					len := element_data["len"]       or { continue }.f64()
-					id := element_data["element-id"] or { continue }.int()
-					
-					pattern := project.patterns[id]  or { continue }
+		mut track := project.new_track(track_title) or { return error("Failed to create new track object in project : ${err}") }
+		raw_elements := (track_data["elements"] or { break }).as_array()
+		for raw_element in raw_elements {
+			element_data := raw_element.as_map()
+			typ := element_data["type"]   or { continue }.str()
+			from := element_data["from"]     or { continue }.f64()
+			len := element_data["len"]       or { continue }.f64()
+			id := element_data["element-id"] or { continue }.int()
+			
+			match typ {
+				"pattern" {
+					pattern := project.patterns[id] or {
+						log.warn("Save File contains pointer to inexistent pattern '${id}' in track '${track_title}'")
+						continue
+					}
 					track.add_element(pattern, from, len)
 				}
+				else {
+					log.warn("Track '${track_title}' in Save File contains unknown element type : ${typ}")
+				}
 			}
-			else {  }
 		}
 		
 		// TODO : Implement sounds & animations

@@ -1,6 +1,6 @@
 import gg
 
-import app.context { DlRenderContext }
+import context { DlRenderContext }
 import std { Color }
 import std.geom2 { Vec2, Rect2 }
 import audio

@@ -8,16 +8,15 @@ pub fn (mut project Project) get_global_pcm_frames(time f64, frame_count u32) []
 	// TODO : Implement this through the node system & Optimize heavily
 	for track in project.tracks {
 		for element in track.elements {
-			if element.obj is Pattern {
-				for note in element.obj.notes {
-					mut instrument := element.obj.instruments[note] or {
+			if element.obj is &Pattern {
+				pattern := element.get_obj[Pattern]()
+				for note in pattern.notes {
+					mut instrument := pattern.instruments[note] or {
 						println("Failed to render following note due to it not having a linked instrument (note will be ignored) : ${note}")
 						continue
 					}
 					layers << instrument.read_pcm_frames([note], time, frame_count, project.sample_rate, project.channels, project.bpm)
 				}
-			} else if element.obj is Sound {
-				// TODO : This
 			}
 		}
 	}

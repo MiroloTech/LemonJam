@@ -1,6 +1,6 @@
 module app
 
-import audio.objs { Instrument, Pattern, Effect, Note, Track, TrackType }
+import audio.objs { Instrument, Pattern, Effect, Note, Track }
 import std { Color, ByteStack }
 import mirrorlib { NID, NIDType, Packet, Server, Conn, Session }
 

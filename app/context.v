@@ -1,6 +1,6 @@
 module app
 
-import app.context { DlRenderContext }
+import context { DlRenderContext }
 
 pub fn (mut project Project) make_contexts(context_tags []string) map[string]voidptr {
 	mut contexts := map[string]voidptr{}

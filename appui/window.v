@@ -144,7 +144,6 @@ pub fn (mut win Window) init(mut ui UI) {
 			pos,
 			Vec2{300, 125},
 			win.project
-			// unsafe { nil }
 		)
 	})
 	
@@ -156,6 +155,7 @@ pub fn (mut win Window) init(mut ui UI) {
 			ui.call_hook("open-pattern", pattern_ptr) or { return }
 		}, pattern)
 		pattern_rack.elements << element
+		ui.call_hook("open-pattern", pattern) or { return }
 	}
 	
 	
@@ -191,13 +191,11 @@ pub fn (mut win Window) init(mut ui UI) {
 		}) // > Connect hook to create new sound
 	]
 	
-	win.project.load_from_file("${get_appdata_path()}/projects/empty.json") or { log.failed("Failed to load project form file : ${err}") } // TEMP & TODO
+	win.project.load_from_file("${get_appdata_path()}/projects/temp.json") or { log.failed("Failed to load project form file : ${err}") } // TEMP & TODO
 	win.project.update_ui_from_save_file(mut ui)
 	// win.toaster.add_toast("Save file loaded", .info, 2.0) // TODO : Move the loading to seperate function and buffer toasts until first redraw
 	
-	// UNSAFE !!!!
 	win.note_editor.init_tools(mut win.project)
-	// win.note_editor.open_pattern(win.project.patterns[0] or { unsafe { nil } })
 	ui.hooks["open-pattern"] = fn [mut win] (pattern_ptr voidptr) { win.note_editor.open_pattern(pattern_ptr) }
 	
 	// Call initialization hook for user button
