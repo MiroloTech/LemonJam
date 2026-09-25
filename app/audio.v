@@ -69,9 +69,9 @@ pub fn (project &Project) get_active_instrument() &Instrument {
 struct Playback {
 	pub mut:
 	device                      &AudioDevice            = unsafe { nil }
-	preview_time                f64
-	preview_target_samples      int
-	seek_preview_time           f64                     = 0.5
+	time                        f64
+	last_time_step              f64
+	playing                     bool
 	
 	preview_pattern             ?&Pattern
 }
@@ -85,32 +85,46 @@ pub fn (mut project Project) set_playback_target_pattern(pattern ?&Pattern) {
 pub fn (mut project Project) ready_playback() ! {
 	mut device := AudioDevice{
 		wave_callback: fn [mut project] (frame_count u32, sample_rate u32, channels u32) []f64 {
-			// TODO : Fix GC error by MAYBEEEEE locking the project when modifying it's values
-			// (may cause concurrency issues when trying to offset preview_beets in seek_playback while offseting them in this callback fucntion)
+			
+			// Update base values, which are needed to act on the next pcm frame
 			sample_count := frame_count / channels
-			first_frame_time := f64(frame_count) / f64(sample_rate)
-			if project.playback.preview_target_samples > 0 {
-				project.playback.preview_target_samples = int_max(project.playback.preview_target_samples - int(sample_count), 0)
+			project.playback.last_time_step = f64(sample_count) / f64(sample_rate)
+			if project.playback.playing {
+				project.playback.time += project.playback.last_time_step
 			}
-			if project.playback.preview_target_samples == 0 {
-				return []f64{len: int(frame_count), init: 0.0}
+			
+			// Get frames to play in current frame
+			if project.playback.playing {
+				return project.read_pcm_frames(project.playback.time, frame_count, sample_rate, channels)
 			}
-			project.playback.preview_time = f64(project.playback.preview_time) + first_frame_time
-			frames := project.read_pcm_frames(project.playback.preview_time, frame_count, sample_rate, channels)
-			return frames
+			return []f64{len: int(frame_count), init: 0.0}
 		}
 	}
 	project.playback = Playback{device: &device}
 	project.playback.device.init()!
 }
 
-// Simple preview time setter. If play preview is set to true, a small preview section of the audio is played
-pub fn (mut project Project) seek_playback(beats f64, play_preview bool) {
-	project.playback.preview_time = beats / f64(project.bpm / 60.0)
-	if play_preview && project.playback.preview_target_samples == 0 {
-		project.playback.preview_target_samples = int(f64(project.sample_rate) * project.playback.seek_preview_time) // Plays a half of a second of preview audio
-	}
+
+// Sets the is-playing status of the playback
+pub fn (mut project Project) set_playing(is_playing bool) {
+	project.playback.playing = is_playing
 }
+
+// Simple preview time setter. If play preview is set to true, a small preview section of the audio is played
+pub fn (mut project Project) seek_playback_time(beat_time f64) {
+	project.playback.time = beat_time / f64(project.bpm / 60.0)
+}
+
+// Returns the current playback time varibale in real time
+pub fn (project Project) get_playback_time() f64 {
+	return project.playback.time
+}
+
+// Returns the current playback time variable in beat time
+pub fn (project Project) get_playback_beat_time() f64 {
+	return project.playback.time * f64(project.bpm / 60.0)
+}
+
 
 // Plays a preview set of pcm frames over everythin, directly to the output, avioding the audio node graph (this is a callback for the playback device, set by `project.ready_playback`)
 pub fn (mut project Project) read_pcm_frames(time f64, frame_count u32, sample_rate u32, channels u32) []f64 {

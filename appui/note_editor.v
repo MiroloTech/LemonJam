@@ -95,17 +95,12 @@ pub fn (mut editor NoteEditor) draw(mut ui UI) {
 	}
 	
 	ui.pop_scissor()
+	editor.update_playback()
 }
 
 pub fn (mut editor NoteEditor) event(mut ui UI, event &gg.Event) ! {
 	mpos := Vec2{event.mouse_x, event.mouse_y}
 	is_inside_window := Rect2.from_size(editor.from, editor.size).is_point_inside(mpos)
-	
-	// TEST!
-	if event.typ == .key_down && event.key_code == .space {
-		editor.project.set_playback_target_pattern(editor.pattern)
-		editor.project.seek_playback(editor.playhead.pos, true)
-	}
 	
 	// Control headbar events
 	editor.control_playhead(event)!
@@ -374,102 +369,27 @@ pub fn (mut editor NoteEditor) draw_tools(mut ui UI) {
 }
 
 
-
-
-// ========== EVENT CONTROLS ==========
-
-/*
-pub fn (mut editor NoteEditor) control_notes(mut ui UI, event &gg.Event) ! {
-	mpos := Vec2{event.mouse_x, event.mouse_y}
-	editing_rect := Rect2{a: editor.from + Vec2{editor.piano_width, editor.header_height}, b: editor.from + editor.size - Vec2{editor.piano_width, 0.0}}
-	editor.hovering_note = unsafe { nil }
+pub fn (mut editor NoteEditor) update_playback() {
+	editor.project.set_playing(editor.playing && editor.pattern != unsafe { nil })
 	
-	if editing_rect.is_point_inside(mpos) {
-		rails := editor.piano.get_piano_rails(editing_rect.a, editing_rect.size())
-		
-		// > Reset handles
-		if !editor.dragging_note_handles {
-			editor.right_handles = []
-			editor.left_handles = []
+	if editor.playing && editor.pattern != unsafe { nil } {
+		// pattern_length := f64_min(editor.pattern.get_total_length(), 4.0)
+		// pattern_length_realtime := pattern_length * (editor.project.bpm / 60.0)
+		/*
+		for next_frame_time > pattern_length_realtime {
+			next_frame_time -= pattern_length_realtime
 		}
-		
-		for note in editor.pattern.notes {
-			color := editor.pattern.colors[note] or { Color.hex("#ffffff") }
-			rail_id := int(note.id)
-			rail := rails[rail_id] or {
-				log.warn("Tried to draw note out of range : ${note}")
-				continue
-			}
-			
-			fromx := editor.from.x + editor.piano_width + note.from * editor.pixels_per_beat - editor.scroll_x
-			sizex := note.len * editor.pixels_per_beat
-			
-			is_color_selected := editor.colors[editor.selected_color] == color
-			note_rect := Rect2.from_size(Vec2{fromx, rail.a.y}, Vec2{sizex, rail.size().y})
-			if is_color_selected && note_rect.is_point_inside(mpos) && editor.hovering_note == unsafe { nil } {
-				editor.hovering_note = note
-			}
-			
-			// Set handles
-			is_mouse_in_rail := rail.a.y <= mpos.y && mpos.y < rail.b.y
-			if is_mouse_in_rail && is_color_selected && !editor.dragging_note_handles {
-				// > Calculate the distance from the mouse to the edges of the note to determine the handles
-				mut dist_left := fromx - mpos.x
-				mut dist_right := (fromx + sizex) - mpos.x
-				
-				// > Determine which handle to aply to each side
-				if f64_abs(dist_right) <= editor.note_inside_drag_dist || (dist_right < editor.note_outside_drag_dist && dist_right > 0.0) {
-					editor.right_handles << note
-				}
-				
-				if f64_abs(dist_left) <= editor.note_inside_drag_dist || (-dist_left < editor.note_outside_drag_dist && -dist_left > 0.0) {
-					editor.left_handles << note
-				}
-			}
-		}
-		
-		if event.typ == .mouse_down && event.mouse_button == .left {
-			if editor.left_handles.len > 0 || editor.right_handles.len > 0 {
-				editor.dragging_note_handles = true
-			} else if editor.hovering_note == unsafe { nil } {
-				editor.selected_notes = []
-			} else if event.modifiers & 0b1 == 0b1 {
-				editor.selected_notes << editor.hovering_note
-			} else {
-				editor.selected_notes = [editor.hovering_note]
-			}
-			return uilib.surpress_event()
-		}
+		*/
+		// println(next_frame_time)
 	}
 	
-	if event.typ == .mouse_down && event.mouse_button == .left {
-		if editor.left_handles.len > 0 || editor.right_handles.len > 0 {
-			editor.dragging_note_handles = true
-		}
-	}
-	
-	if event.typ == .mouse_move && editor.dragging_note_handles {
-		step := f64(event.mouse_dx) / editor.pixels_per_beat
-		// TODO : Implement snapping
-		for mut right in editor.right_handles {
-			right.len += step
-		}
-		for mut left in editor.left_handles {
-			left.from += step
-			left.len -= step
-		}
-	}
-	
-	if event.typ == .mouse_up {
-		editor.dragging_note_handles = false
-		// ... left and right handles recalculated on release event
-	}
+	editor.playhead.pos = editor.project.get_playback_beat_time()
 }
-
-*/
 
 
 pub fn (mut editor NoteEditor) control_playhead(event &gg.Event) ! {
+	editor.project.set_playback_target_pattern(editor.pattern)
+	
 	editor.playhead.event(event)!
 	if editor.playhead.on_drag == none && editor.pattern != unsafe { nil } {
 		editor.playhead.on_drag = fn [mut editor] (t f64) {
@@ -483,8 +403,9 @@ pub fn (mut editor NoteEditor) control_playhead(event &gg.Event) ! {
 			)
 			*/
 			// TODO : Add playback mask here
-			editor.project.set_playback_target_pattern(editor.pattern)
-			editor.project.seek_playback(t, true)
+			// editor.project.set_playback_target_pattern(editor.pattern)
+			
+			editor.project.seek_playback_time(t)
 		}
 	}
 }
@@ -503,6 +424,16 @@ pub fn (mut editor NoteEditor) control_tool_bar(mut ui UI, event &gg.Event) ! {
 		
 		// > Move next tool position
 		tool_position.x += tool_size.x + ui.style.padding
+	}
+	
+	// Control play button
+	icon_size := editor.header_height * 0.5 - ui.style.padding * 2.0
+	bar_center := Vec2{editor.from.x + editor.size.x * 0.5, editor.from.y}
+	play_button_rect := Rect2.from_size(bar_center - Vec2{icon_size * 0.5, -2.0}, Vec2.v(icon_size))
+	if event.typ == .mouse_down {
+		if play_button_rect.is_point_inside(ui.mpos) {
+			editor.playing = !editor.playing
+		}
 	}
 }
 

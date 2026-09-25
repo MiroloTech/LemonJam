@@ -150,7 +150,7 @@ pub fn pcm_frames(ptr voidptr, notes []Note, time f64, frame_count u32, sample_r
 	mut frames := []f64{len: int(frame_count), init: 0.0}
 	
 	// Get all effected notes
-	for i in 0..frame_count {
+	for i in 0..(frame_count / channels) {
 		for c in 0..channels {
 			mut v := f64(0.0)
 			for note in notes {
