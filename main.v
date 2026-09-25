@@ -27,6 +27,7 @@ fn main() {
 		event_fn:         app.event
 		cleanup_fn:       app.cleanup
 		sample_count:     4
+		swap_interval:    0
 	)
 	app.ui.ctx.run()
 }
@@ -34,6 +35,7 @@ fn main() {
 pub fn (mut app App) init() {
 	app.ui.init()
 	app.window.init(mut app.ui)
+	println("App intialized.")
 }
 
 
@@ -41,6 +43,7 @@ pub fn (mut app App) frame() {
 	app.ui.ctx.begin()
 	app.window.frame(mut app.ui)
 	app.ui.draw()
+	// app.ui.ctx.show_fps()
 	app.ui.ctx.end()
 }
 

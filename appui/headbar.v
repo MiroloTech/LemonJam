@@ -63,9 +63,11 @@ pub struct Header {
 
 pub fn (mut header Header) init(mut ui UI) {
 	// Connect event hooks
+	/*
 	ui.on_mouse_down << fn [mut header] (mut ui UI, mpos Vec2) ! {
-		// header.on_mouse_down(mut ui, mpos)!
+		header.on_mouse_down(mut ui, mpos)!
 	}
+	*/
 	ui.on_mouse_move << fn [mut header] (mut ui UI, mpos Vec2, mdelta Vec2) ! {
 		header.on_mouse_move(mut ui, mpos, mdelta)!
 	}
@@ -79,9 +81,6 @@ pub fn (mut header Header) init(mut ui UI) {
 		header.user_btn.color_primary = color
 		header.user_btn.color_secondary = color.darken(0.05)
 	}
-	
-	// Popup user actions on press
-	header.user_btn
 }
 
 
@@ -232,7 +231,7 @@ pub fn (mut header Header) on_mouse_move(mut ui UI, mpos Vec2, _ Vec2) ! {
 	for i in 0..header.options.len {
 		x, width := header.get_option_dimensions(mut ui, i)
 		
-		if mpos.y >= 0.0 && mpos.y < header.height && mpos.x >= x  && mpos.x < x + width {
+		if mpos.y >= 0.0 && mpos.y < header.height && mpos.x >= x && mpos.x < x + width {
 			header.option_hovered = i
 		}
 	}

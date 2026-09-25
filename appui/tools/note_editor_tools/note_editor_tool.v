@@ -24,10 +24,3 @@ fn get_selected_notes(note_uis []&NoteUI) []&NoteUI {
 	}
 	return notes
 }
-
-// Deselects every note in the array
-fn deselect_all(mut note_uis []&NoteUI) {
-	for mut note in note_uis {
-		note.is_selected = false
-	}
-}

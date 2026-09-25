@@ -13,6 +13,8 @@ import appui.popups { NewPatternPopup, NewSessionPopup, JoinSessionPopup, Logger
 
 pub struct Window {
 	pub mut:
+	project                &Project                  = unsafe { nil }
+	
 	toaster                Toaster                   = Toaster{}
 	header                 Header                    = Header{}
 	footer                 Footer                    = Footer{}
@@ -23,8 +25,6 @@ pub struct Window {
 	main_vsplit            VSplit                    = VSplit{}
 	note_editor            &NoteEditor               = &NoteEditor{}
 	timeline               &Timeline                 = &Timeline{}
-	
-	project                &Project                  = unsafe { nil }
 	
 	// TODO : [x] Browser, Rack, Routing Graph, Timeline, Sound Editor, Pattern Editor
 }
@@ -106,27 +106,6 @@ pub fn (mut win Window) init(mut ui UI) {
 	win.main_vsplit.splits = [500.0]
 	
 	// Init browser
-	/*
-	win.browser.groups = [
-		// TODO : Implement path criteria, from which all elements are infered as the names of every file / folder in the thing
-		// > Additionally, each group gets its own on_select hook, whch opens up the path to the element, that has been clicked
-		// > Remove elements array to force auto-loading
-		BrowserGroup.new(
-			"Instrument",
-			ui.style.color_instrument,
-			os.join_path(get_appdata_path(), "instruments"),
-			fn [mut win] (path string) {
-				
-			}
-		),
-		/*
-		BrowserGroup.new("Effects", ui.style.color_effect, [
-			BrowserElement.new("Bit Crush", "", "")
-			BrowserElement.new("Radio Cracks", "", "")
-		])
-		*/
-	]
-	*/
 	win.browser.init(mut ui, mut win.project, get_appdata_path(), ["icons/", "fonts/", "projects/", "*.log", "*.md", "*.json"], true)
 	
 	// Init rack
@@ -147,7 +126,7 @@ pub fn (mut win Window) init(mut ui UI) {
 		)
 	})
 	
-	ui.hooks["add-to-pattern-list"] = fn [mut win, mut pattern_rack, mut ui] (pattern_ptr voidptr) {
+	ui.hooks["add-to-pattern-list"] = fn [mut pattern_rack, mut ui] (pattern_ptr voidptr) {
 		pattern := unsafe { &Pattern(pattern_ptr) }
 		mut element := RackElement.new(pattern.name,  ui.style.color_pattern)
 		element.connect_hook(fn [mut ui] (pattern_ptr voidptr) {
@@ -160,7 +139,7 @@ pub fn (mut win Window) init(mut ui UI) {
 	
 	
 	
-	ui.hooks["add-to-instrument-list"] = fn [mut win, mut instrument_rack, mut ui] (instrument_ptr voidptr) {
+	ui.hooks["add-to-instrument-list"] = fn [mut instrument_rack, mut ui] (instrument_ptr voidptr) {
 		mut instrument := unsafe { &Instrument(instrument_ptr) }
 		mut element := RackElement.new(instrument.name,  ui.style.color_instrument)
 		element.connect_hook(fn [mut ui] (instrument_ptr voidptr) {
@@ -195,7 +174,7 @@ pub fn (mut win Window) init(mut ui UI) {
 	win.project.update_ui_from_save_file(mut ui)
 	// win.toaster.add_toast("Save file loaded", .info, 2.0) // TODO : Move the loading to seperate function and buffer toasts until first redraw
 	
-	win.note_editor.init_tools(mut win.project)
+	win.note_editor.init(mut ui, mut win.project)
 	ui.hooks["open-pattern"] = fn [mut win] (pattern_ptr voidptr) { win.note_editor.open_pattern(pattern_ptr) }
 	
 	// Call initialization hook for user button
@@ -297,8 +276,6 @@ pub fn (mut win Window) frame(mut ui UI) {
 	// Draw toaster
 	win.toaster.from = ui.bottom_right() - Vec2{40, 40}
 	win.toaster.draw(mut ui)
-	
-	// ui.draw_icon("not-found", Vec2{0, 0}, Vec2{100, 100}, Color.hex("#f1f6f0"))
 	
 	// Update Session if active
 	if win.project.session != unsafe { nil } {

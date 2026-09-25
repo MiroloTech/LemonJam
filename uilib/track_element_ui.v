@@ -27,6 +27,7 @@ pub fn TrackElementUI.from_element_arr(elements []&TrackElement) []&TrackElement
 	}
 	return element_uis
 }
+
 pub fn (element_ui TrackElementUI) draw(mut ui UI, from Vec2, size Vec2) {
 	// Draw BG
 	ui.draw_rect(
@@ -69,8 +70,8 @@ pub fn (element_ui TrackElementUI) draw(mut ui UI, from Vec2, size Vec2) {
 	)
 	
 	// Draw element preview
-	if element_ui.element.obj is &Pattern {
-		pattern := &Pattern(element_ui.element.obj)
+	if element_ui.element.obj is Pattern {
+		pattern := element_ui.element.obj
 		
 		// > Collect note range
 		mut min_note := -1

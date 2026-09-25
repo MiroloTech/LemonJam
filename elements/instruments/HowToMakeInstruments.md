@@ -7,7 +7,7 @@ Therefore it must have a specific structure to properly work.
 
 ## Compiling
 
-To compile the instrument to properly be able to use it, use the following command to export it as a .dll or .so file:
+To compile the instrument to be properly able to use it, use the following command to export it as a .dll or .so file:
 
 ```v -shared -prod <path to instrument folder or file> ```
 

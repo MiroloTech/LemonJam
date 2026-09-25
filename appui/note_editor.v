@@ -9,7 +9,8 @@ import audio.objs { Note, Pattern }
 import std { Color }
 import std.geom2 { Vec2, Rect2 }
 import uilib { UI, ActionList, Piano, NoteUI, Playhead }
-import appui.tools.note_editor_tools { NoteEditorToolSkeleton, ToolMoveNotes, ToolCutNotes, ToolSelectNotes, ToolPlaceNotes, ToolDeleteNotes }
+import appui.tools.note_editor_tools { NoteEditorToolSkeleton, ToolSelectNotes, ToolMoveNotes, ToolCutNotes, ToolPlaceNotes, ToolDeleteNotes }
+import context { DlNoteEditorToolContext }
 
 @[heap]
 pub struct NoteEditor {
@@ -39,16 +40,17 @@ pub struct NoteEditor {
 	
 	playing                      bool
 	playhead                     Playhead         = Playhead{}
+	note_snapping                f64              = 0.5 // bars
 	
 	piano                        Piano            = Piano{}
 	piano_width                  f64              = 180.0
 	
 	tools                        []NoteEditorToolSkeleton = [
-		ToolSelectNotes{},
-		ToolMoveNotes{},
-		ToolCutNotes{},
-		ToolPlaceNotes{},
-		ToolDeleteNotes{}
+		// ToolSelectNotes{},
+		// ToolMoveNotes{},
+		// ToolCutNotes{},
+		// ToolPlaceNotes{},
+		// ToolDeleteNotes{}
 	]
 	selected_tool                int
 	
@@ -56,7 +58,6 @@ pub struct NoteEditor {
 	note_inside_drag_dist        f64              = 4.0
 	note_outside_drag_dist       f64              = 12.0
 	scrub_snapping               f64              = 0.5
-	note_snapping                f64              = 0.5 // bars
 	
 	mut:
 	panning                      bool
@@ -67,6 +68,11 @@ pub struct NoteEditor {
 }
 
 const note_tags := ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+
+pub fn (mut editor NoteEditor) init(mut ui UI, mut project Project) {
+	editor.project = project
+	editor.init_tools(mut ui, mut project)
+}
 
 pub fn (mut editor NoteEditor) draw(mut ui UI) {
 	ui.push_scissor(a: editor.from, b: editor.from + editor.size)
@@ -158,7 +164,7 @@ pub fn (mut editor NoteEditor) event(mut ui UI, event &gg.Event) ! {
 	// Control tools
 	editor_rect := Rect2{editor.from + Vec2{0.0, editor.header_height}, editor.from + editor.size}
 	if editor_rect.is_point_inside(ui.mpos) || event.typ == .mouse_up {
-		editor.tools[editor.selected_tool].event(mut ui, event)
+		editor.tools[editor.selected_tool].event(event)
 	}
 }
 
@@ -357,15 +363,12 @@ pub fn (mut editor NoteEditor) draw_tools(mut ui UI) {
 		tool_position.x += tool_size.x + ui.style.padding
 	}
 	
-	// Update note_uis list for current tool
-	editor.tools[editor.selected_tool].elements = editor.notes
-	
-	editor_rect := Rect2{editor.from + Vec2{editor.piano.size.x, editor.header_height}, editor.from + editor.size}
 	
 	// Call draw function on selected tool
+	editor_rect := Rect2{editor.from + Vec2{editor.piano.size.x, editor.header_height}, editor.from + editor.size}
 	ui.push_scissor(editor_rect)
 	ui.cursor_locked = !editor_rect.is_point_inside(ui.mpos)
-	editor.tools[editor.selected_tool].draw(mut ui)
+	editor.tools[editor.selected_tool].draw()
 	ui.pop_scissor()
 	ui.cursor_locked = false
 }
@@ -509,67 +512,53 @@ pub fn (mut editor NoteEditor) open_pattern(pattern &Pattern) {
 	editor.notes = NoteUI.from_pattern(pattern)
 	
 	// attach new reference to pattern for each tool
+	/*
 	for mut tool in editor.tools {
 		tool.pattern = pattern
 	}
+	*/
 }
 
-pub fn (mut editor NoteEditor) init_tools(mut project &Project) {
-	editor.project = project
-	
-	for mut tool in editor.tools {
-		tool.project = project
-		tool.grid_world_conv.world_to_grid = fn [mut editor] (pos Vec2) (f64, int) {
-			rect := Rect2{editor.from + Vec2{editor.piano_width, editor.header_height}, editor.from + editor.size - Vec2{editor.piano_width, editor.header_height}}
-			mut fromx := (pos.x - editor.from.x - editor.piano_width + editor.scroll_x) / editor.pixels_per_beat
-			fromx = f64_max(floor(fromx / editor.note_snapping) * editor.note_snapping, 0.0)
-			rail_id := editor.piano.get_rail_id(pos.y, rect.a + Vec2{editor.piano_width, 0.0}, rect.size())
-			return fromx, rail_id
-		}
-		tool.grid_world_conv.grid_to_world = fn [mut editor] (time f64, id int) Vec2 {
-			rect := Rect2{editor.from + Vec2{editor.piano_width, editor.header_height}, editor.from + editor.size - Vec2{editor.piano_width, editor.header_height}}
-			rails := editor.piano.get_piano_rails(rect.a + Vec2{editor.piano_width, 0.0}, rect.size())
-			
-			rail := rails[id] or {
-				return Vec2.zero()
-			}
-			
-			fromx := editor.from.x + editor.piano_width + time * editor.pixels_per_beat - editor.scroll_x
-			return Vec2{fromx, rail.a.y}
-		}
-		tool.create_note = fn [mut editor] (note_ui &NoteUI) {
-			/*
-			// > Add to pattern
-			editor.pattern.notes << note_ui.note
-			// editor.pattern.colors[note_ui.note] = editor.colors[editor.selected_color] or { Color.hex("#ff0000") }
-			editor.pattern.instruments[note_ui.note] = unsafe { nil }
-			
-			*/
-			// > Add to UI
-			editor.notes << note_ui
-		}
-		tool.delete_note = fn [mut editor] (note_ui &NoteUI) {
-			// > Remove from UI
-			list_idx := editor.notes.index(note_ui)
-			if list_idx == -1 { return }
-			editor.notes.delete(list_idx)
-			
-			// > Remove from pattern
-			/*
-			pattern_idx := editor.pattern.notes.index(note_ui.note)
-			if pattern_idx == -1 { return }
-			editor.pattern.notes.delete(pattern_idx)
-			// editor.pattern.colors.delete(note_ui.note)
-			editor.pattern.instruments.delete(note_ui.note)
-			*/
-		}
+
+// ========== TOOLS ==========
+
+pub fn (editor NoteEditor) get_pattern() &Pattern {
+	return editor.pattern
+}
+
+pub fn (mut editor NoteEditor) add_note_ui(note_ui &NoteUI) {
+	editor.notes << note_ui
+}
+
+pub fn (mut editor NoteEditor) remove_note_ui(note_ui &NoteUI) {
+	idx := editor.notes.index(note_ui)
+	if idx != -1 {
+		editor.notes.delete(idx)
 	}
+}
+
+pub fn (editor NoteEditor) get_note_uis() []&NoteUI {
+	return editor.notes
+}
+
+
+pub fn (mut editor NoteEditor) init_tools(mut ui UI, mut project Project) {
+	mut tool_ctx := DlNoteEditorToolContext.new(mut ui, mut editor, mut project)
+	
+	editor.tools << ToolSelectNotes{ctx: tool_ctx}
+	editor.tools << ToolMoveNotes{ctx: tool_ctx}
+	editor.tools << ToolCutNotes{ctx: tool_ctx}
+	editor.tools << ToolPlaceNotes{ctx: tool_ctx}
+	editor.tools << ToolDeleteNotes{ctx: tool_ctx}
+	
+	//  TODO : Save Tool Context in Project to allow for live addon-adding
+	
 	editor.update_tool_colors()
 }
 
 fn (mut editor NoteEditor) update_tool_colors() {
 	for mut tool in editor.tools {
-		tool.current_color = editor.colors[editor.selected_color] or { Color.hex("#ff0000") }
+		tool.ctx.active_color = editor.colors[editor.selected_color] or { Color.hex("#ff0000") }
 	}
 }
 

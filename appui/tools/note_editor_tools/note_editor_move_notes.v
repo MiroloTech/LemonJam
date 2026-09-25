@@ -1,6 +1,7 @@
 module note_editor_tools
 
 import gg
+import sokol.sapp { MouseCursor }
 
 import uilib { UI, NoteUI }
 // import std.geom2 { Vec2, Rect2 }
@@ -26,19 +27,21 @@ pub struct ToolMoveNotes {
 }
 	
 	
-pub fn (mut tool ToolMoveNotes) event(mut ui UI, event &gg.Event) {
+pub fn (mut tool ToolMoveNotes) event(event &gg.Event) {
 	// > Get grabbed note if found
 	if event.typ == .mouse_down && event.mouse_button == .left {
 		// > Deselect previously-grabbed note
-		if tool.grabbed_note != unsafe { nil } && get_selected_notes(tool.elements).len <= 1 {
+		if tool.grabbed_note != unsafe { nil } && tool.ctx.get_selected_notes().len <= 1 {
 			tool.grabbed_note.is_selected = false
 		}
 		
 		// > Find note at mouse and select
-		note := get_note_at_pos(ui.mpos, tool.elements)
+		note := get_note_at_pos(tool.ctx.get_mpos(), tool.ctx.get_notes())
 		if note == unsafe { nil } { return }
-		if !note.is_selected && get_selected_notes(tool.elements).len > 0 {
-			deselect_all(mut tool.elements)
+		if !note.is_selected && tool.ctx.get_selected_notes().len > 0 {
+			for mut n in tool.ctx.get_notes() {
+				n.is_selected = false
+			}
 		}
 		tool.grabbed_note = note
 		tool.grabbed_note.is_selected = true
@@ -46,14 +49,14 @@ pub fn (mut tool ToolMoveNotes) event(mut ui UI, event &gg.Event) {
 		// > Update starting positions for each note
 		tool.starting_ids.clear()
 		tool.starting_times.clear()
-		for note_ui in get_selected_notes(tool.elements) {
+		for note_ui in tool.ctx.get_selected_notes() {
 			if note_ui.is_selected {
 				tool.starting_ids << note_ui.note.id
 				tool.starting_times << note_ui.note.from
 			}
 		}
 		
-		tool.start_time, tool.start_id = tool.grid_world_conv.world_to_grid(ui.mpos)
+		tool.start_time, tool.start_id = tool.ctx.world_to_grid(tool.ctx.get_mpos())
 	}
 	
 	// > Remove all starting data for every note
@@ -64,30 +67,30 @@ pub fn (mut tool ToolMoveNotes) event(mut ui UI, event &gg.Event) {
 	
 	// > Drack offset data
 	if event.typ == .mouse_move && event.mouse_button == .left {
-		time, id := tool.grid_world_conv.world_to_grid(ui.mpos)
+		time, id := tool.ctx.world_to_grid(tool.ctx.get_mpos())
 		tool.offset_id = id - tool.start_id
 		tool.offset_time = time - tool.start_time
 		
 		// > Update note positioning
-		for i, mut note_ui in get_selected_notes(tool.elements) {
+		for i, mut note_ui in tool.ctx.get_selected_notes() {
 			start_id := tool.starting_ids[i] or { continue }
 			start_time := tool.starting_times[i] or { continue }
 			note_ui.note.id = start_id + tool.offset_id
 			note_ui.note.from = start_time + tool.offset_time
-			tool.project.update_note(note_ui.note)
+			tool.ctx.force_update_note(note_ui)
 		}
 		
 		// TODO : Add better snapping & clamping
 	}
 }
 
-pub fn (mut tool ToolMoveNotes) draw(mut ui UI) {
+pub fn (mut tool ToolMoveNotes) draw() {
 	// Update cursor
-	hovered_note := get_note_at_pos(ui.mpos, tool.elements) // tool.get_note_at_pos(tool.mpos)
+	hovered_note := get_note_at_pos(tool.ctx.get_mpos(), tool.ctx.get_notes()) // tool.get_note_at_pos(tool.mpos)
 	if hovered_note != unsafe { nil } {
-		ui.set_cursor(.pointing_hand)
+		tool.ctx.set_cursor(MouseCursor.pointing_hand)
 	} else {
-		ui.set_cursor(.default)
+		tool.ctx.set_cursor(MouseCursor.default)
 	}
 	
 }

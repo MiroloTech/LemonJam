@@ -208,6 +208,7 @@ pub fn (timeline Timeline) draw_track(mut ui UI, from Vec2, mut track TrackUI) {
 	// Draw Track Elements
 	ui.push_scissor(a: timeline.from + Vec2{timeline.track_head_width - 1, timeline.header_height}, b: timeline.from + timeline.size)
 	
+	
 	for mut element_ui in track.element_uis {
 		// > Draw base BG
 		element_from := from + Vec2{timeline.track_head_width - ui.style.padding, 0.0} + Vec2{element_ui.element.from * timeline.scaling.x, 0.0} - Vec2{timeline.scroll.x, 0.0}

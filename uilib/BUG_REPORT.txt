@@ -1,0 +1,19 @@
+The issue is, that the V compiler misses a quit dangerous operation, where a double-reference is fully dereferenced, while a simple reference is expected.
+This also causes the tcc compiler to completely fail without any readable error message. The error is only readable through the clang compiler.
+
+
+
+if element_ui.element.obj is Pattern {
+    pattern := &Pattern(*element_ui.element.obj)
+}
+
+(where element_ui.element.obj is usually of type interface)
+
+turns into:
+
+audio__objs__Pattern** pattern = (element_ui->element->obj->_audio__objs__Pattern);
+
+where:
+
+\\AppData\\Local\\Temp\\v_0\\LEE26C~1.C:224420:59: error: operand of type 'audio__objs__Pattern' (aka 'struct audio__objs__Pattern') where arithmetic or pointer type is required
+cc:  224420 |                 audio__objs__Pattern* pattern = ((audio__objs__Pattern*)(*(element_ui->element->obj->_audio__objs__Pattern)));

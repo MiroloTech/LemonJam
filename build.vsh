@@ -46,7 +46,9 @@ for entry in instruments {
 	println("Compiling instrument '${entry}'...")
 	
 	// > Compile instrument
-	result := execute("v -shared elements/instruments/${entry}") // -prod 
+	// TODO : Add custom arguments here to modify app compilation
+	result := execute("v -shared elements/instruments/${entry}") // -prod
+	// result := execute('v -cc clang -cflags "-D_WIN32_WINNT=0x0601" -shared -keepc -g -o ${entry}_debug elements/instruments/${entry}') // -prod 
 	if result.output != "" {
 		println(result.output)
 	}

@@ -125,8 +125,25 @@ pub fn (mut instrument Instrument) event(event &gg.Event) {
 }
 
 pub fn (mut instrument Instrument) read_pcm_frames(notes []&Note, time f64, frame_count u32, sample_rate u32, channels u32, bpm f64) []f64 {
+	// mut frames := []f64{len: int(frame_count), cap: int(frame_count), init: 0.0}
+	// mut ptr := unsafe { malloc(isize(frame_count * sizeof(f64))) }
 	frames := instrument.fn_pcm_frames(instrument.system, notes.simplify(), time, frame_count, sample_rate, channels, bpm)
+	// unsafe { vmemmove(frames.data, ptr, isize(frame_count * sizeof(f64))) }
 	return frames
+	
+	
+	/*
+	mut frames := []f64{len: int(frame_count), init: 0.0}
+	mut t := time // / f64(bpm / 60.0)
+	for i in 0..(frame_count / channels) {
+		v := sin(t * math.pi * 440.0) * 0.5
+		for c in 0..channels {
+			frames[i * channels + c] = v
+		}
+		t += 1.0 / f64(sample_rate)
+	}
+	return frames
+	*/
 }
 
 
@@ -137,4 +154,4 @@ pub fn (mut instrument Instrument) cleanup() {
 	}
 }
 
-
+// TODO : Fix tcc compiler not working, V compiler falling back to gcc WHICH IS ASSSS!

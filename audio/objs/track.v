@@ -5,6 +5,7 @@ import std.log
 import std { Color }
 import mirrorlib { NID }
 
+@[heap]
 pub interface TrackObject {
 	mut:
 	nid           &NID

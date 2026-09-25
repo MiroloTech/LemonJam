@@ -3,7 +3,7 @@ module note_editor_tools
 import gg
 // import sokol.sapp
 
-import uilib { UI, NoteUI }
+// import uilib { UI, NoteUI }
 // import std.geom2 { Vec2 }
 import std { Color }
 
@@ -16,11 +16,11 @@ pub struct ToolCutNotes {
 	color                   Color             = Color.hex("#56a2e8")
 }
 
-pub fn (mut tool ToolCutNotes) event(mut ui UI, event &gg.Event) {
+pub fn (mut tool ToolCutNotes) event(event &gg.Event) {
 	
 }
 
-pub fn (mut tool ToolCutNotes) draw(mut ui UI) {
+pub fn (mut tool ToolCutNotes) draw() {
 	
 }
 

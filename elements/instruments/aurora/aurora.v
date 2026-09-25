@@ -1,4 +1,5 @@
 import gg
+// import encoding.binary
 
 import context { DlRenderContext }
 import std { Color }
@@ -24,7 +25,7 @@ pub struct Aurora {
 	size                  Vec2
 	
 	// Instrument
-	last_pcm_beat         f64                         = -1.0
+	last_pcm_time         f64                         = -1.0
 	playing_notes         []Note                      = []Note{}
 	preview_time          f64                         = 0.05
 	preview_sample_rate   u32                         = 4000
@@ -136,38 +137,56 @@ pub fn event(ptr voidptr, event &gg.Event) {
 // TODO : Fully rename time to beat to avoid confusion
 
 @[export: 'pcm_frames']
-pub fn pcm_frames(ptr voidptr, notes []Note, beat f64, frame_count u32, sample_rate u32, channels u32, bpm f64) []f64 {
+pub fn pcm_frames(ptr voidptr, notes []Note, time f64, frame_count u32, sample_rate u32, channels u32, bpm f64) []f64 {
+	// println("PCM Frames...")
 	mut aurora := unsafe { &Aurora(ptr) }
 	inv_sample_rate := 1.0 / f64(sample_rate)
-	
+	bps := bpm / 60.0
 	// Create empty frame array
-	if beat != aurora.last_pcm_beat { // > Allow for note stacking, when pcm_frames function is called two times with the same time
-		aurora.playing_notes = []
+	if time != aurora.last_pcm_time { // > Allow for note stacking, when pcm_frames function is called two times with the same time
+		aurora.playing_notes.clear()
 	}
-	time := beat / bpm * 60.0
+	
 	mut frames := []f64{len: int(frame_count), init: 0.0}
 	
 	// Get all effected notes
-	for note in notes {
-		is_time_in_note := note.from <= time && time <= note.from + note.len
-		if is_time_in_note {
-			aurora.playing_notes << note
-			
-			freq := audio.note2freq(f64(note.id))
-			amp := note.volume * 0.25
-			
-			// > Add samples to list of frames
-			for i in 0..frames.len {
-				t := time + f64(i) * inv_sample_rate
-				// print("(${(t*1000):.8},")
-				frames[i] += audio.simple_wave_sin(t, freq, amp)
-				// print("${frame:.3}), ")
+	for i in 0..frame_count {
+		for c in 0..channels {
+			mut v := f64(0.0)
+			for note in notes {
+				note_start := note.from / bps
+				note_end := (note.from + note.len) / bps
+				is_time_in_note := note_start <= time && time <= note_end
+				if is_time_in_note {
+					aurora.playing_notes << note
+					
+					freq := audio.note2freq(f64(note.id))
+					amp := note.volume * 0.25
+					
+					// > Add samples to list of frames
+					t := time + f64(i) * inv_sample_rate
+					v += audio.simple_wave_sin(t, freq, amp)
+					// print("(${(t*1000):.8},")
+					// print("${frame:.3}), ")
+				}
 			}
+			/*
+			bytes := binary.encode_binary(v) or { [u8(0), 0, 0, 0,  0, 0, 0, 0] }
+			for p in 0..sizeof(f64) {
+				unsafe {
+					// frames_ptr[i * sizeof(f64) + p] = u8(bytes[p])
+				}
+			}
+			*/
+			frames[i * channels + c ] = v
 		}
 	}
-	aurora.last_pcm_beat = beat
+	aurora.last_pcm_time = time
 	
-	// Return sample collection
 	return frames
+	// Return sample collection
+	
+	// println("--------------------------")
+	// return frames
 }
 

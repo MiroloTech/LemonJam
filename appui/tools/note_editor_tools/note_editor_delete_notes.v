@@ -1,14 +1,14 @@
 module note_editor_tools
 
 import gg
-// import sokol.sapp
+import sokol.sapp { MouseCursor }
 
 import uilib { UI, NoteUI }
 // import std.geom2 { Vec2 }
 import std { Color }
 
 @[heap]
-pub struct ToolDeleteNotes {
+pub struct ToolDeleteNotes implements NoteEditorToolSkeleton {
 	NoteEditorTool
 	
 	pub:
@@ -21,7 +21,7 @@ pub struct ToolDeleteNotes {
 	dragging                bool
 }
 
-pub fn (mut tool ToolDeleteNotes) event(mut ui UI, event &gg.Event) {
+pub fn (mut tool ToolDeleteNotes) event(event &gg.Event) {
 	// Begin deletion
 	if event.typ == .mouse_down && event.mouse_button == .left {
 		tool.dragging = true
@@ -30,13 +30,13 @@ pub fn (mut tool ToolDeleteNotes) event(mut ui UI, event &gg.Event) {
 	
 	// Add hovered notes to queue
 	if event.typ == .mouse_move && tool.dragging {
-		mut hovered_note := get_note_at_pos(ui.mpos, tool.elements)
+		mut hovered_note := get_note_at_pos(tool.ctx.get_mpos(), tool.ctx.get_notes())
 		if hovered_note != unsafe { nil } {
 			if !tool.queue.contains(hovered_note) {
 				tool.queue << hovered_note
 				
 				// > Highlight note to delete
-				hovered_note.color_override = ui.style.color_grey
+				hovered_note.color_override = tool.ctx.get_style().color_grey
 			}
 		}
 	}
@@ -54,21 +54,22 @@ pub fn (mut tool ToolDeleteNotes) event(mut ui UI, event &gg.Event) {
 	}
 }
 
-pub fn (mut tool ToolDeleteNotes) draw(mut ui UI) {
+pub fn (mut tool ToolDeleteNotes) draw() {
 	// Update cursor
-	hovered_note := get_note_at_pos(ui.mpos, tool.elements)
+	hovered_note := get_note_at_pos(tool.ctx.get_mpos(), tool.ctx.get_notes())
 	if hovered_note != unsafe { nil } {
-		ui.set_cursor(.resize_all)
+		tool.ctx.set_cursor(MouseCursor.pointing_hand)
 	} else {
-		ui.set_cursor(.default)
+		tool.ctx.set_cursor(MouseCursor.default)
 	}
 }
 
 fn (mut tool ToolDeleteNotes) delete_all_in_queue() {
 	// Remove all hovered notes
 	for note in tool.queue {
-		tool.project.delete_note(mut tool.pattern, note.note)
-		tool.delete_note(note)
+		// tool.project.delete_note(mut tool.pattern, note.note)
+		// tool.delete_note(note)
+		tool.ctx.delete_note(note)
 	}
 	
 	// Clear queue

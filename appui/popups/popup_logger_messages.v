@@ -227,7 +227,7 @@ fn u8_to_bin(v u8) u32 {
 
 // Detects and auto-applies a specific profile based on a big profile .json file, which lists decryption instructions for different objects and detection methods to determine the obj from data []u8
 // Returns decrypted object as text or formatting error
-fn profiled_msg_data(data []u8) !string {
+fn profiled_msg_data(_data []u8) !string {
 	return ""
 }
 

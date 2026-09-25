@@ -15,6 +15,7 @@ pub struct AudioDevice {
 	mut:
 	ma_device                     &ma.Device              = unsafe { nil }
 	t                             f64
+	sample_offset                 u64
 	// TODO : Add stack here to read the last n pcm frames for pretty visuals (put into context and give to effetcs and instruments)
 }
 
@@ -29,6 +30,17 @@ pub fn (mut device AudioDevice) init() ! {
 		// sample_count := u64(device.playback_channels) * u64(device.playback_sample_rate) * u64(frame_count)
 		if device.wave_callback != none {
 			samples := device.wave_callback(frame_count, device.playback_sample_rate, device.playback_channels)
+			/*
+			mut samples := []f64{len: int(frame_count), init: 0.0}
+			mut t := f64(device.sample_offset) / f64(device.playback_sample_rate) / f64(device.playback_channels)
+			for i in 0..(frame_count / device.playback_channels) {
+				for c in 0..device.playback_channels {
+					v := sin(t * math.pi * 440.0) * 0.5
+					samples[i * device.playback_channels + c] = v
+				}
+				t += 1.0 / f64(device.playback_sample_rate)
+			}
+			*/
 			// samples := []f64{len: int(frame_count), init: 0.0}
 			// device.t += f64(frame_count)
 			/*
@@ -71,6 +83,7 @@ pub fn (mut device AudioDevice) init() ! {
 				}
 			}
 		}
+		device.sample_offset += u64(frame_count)
 	}
 		
 	// ma_device := &ma.Device{}
